@@ -19,12 +19,12 @@ MySQL.createCommand("vRP/get_vehicle_modifications", "select modifications from 
 MySQL.execute("vRP/create_modifications_column")
 
 local tbl = {
-[1] = {locked = false, player = nil},
-[2] = {locked = false, player = nil},
-[3] = {locked = false, player = nil},
-[4] = {locked = false, player = nil},
-[5] = {locked = false, player = nil},
-[6] = {locked = false, player = nil},
+	[1] = {locked = false, player = nil},
+	[2] = {locked = false, player = nil},
+	[3] = {locked = false, player = nil},
+	[4] = {locked = false, player = nil},
+	[5] = {locked = false, player = nil},
+	[6] = {locked = false, player = nil},
 }
 
 RegisterServerEvent('lockGarage')
@@ -36,13 +36,11 @@ AddEventHandler('lockGarage', function(b,garage)
 		tbl[tonumber(garage)].player = source
 	end
 	TriggerClientEvent('lockGarage',-1,tbl)
-	print(json.encode(tbl))
 end)
 
 RegisterServerEvent('getGarageInfo')
 AddEventHandler('getGarageInfo', function()
 	TriggerClientEvent('lockGarage',-1,tbl)
-	--print(json.encode(tbl))
 end)
 
 AddEventHandler('playerDropped', function()
