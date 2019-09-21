@@ -9,10 +9,8 @@
 
 **How to install:**
 
-   - Put the folder **vrp_lscustoms** inside your resources folder and start it in your server.cfg. Then go to this resources folder and select the resources that you want to use and follow the paths to replace the archives in your resources folder!
+   - Put the folder **vrp_lscustoms** inside your resources folder and start it in your server.cfg. Then go to the resources folder and select the resources that you want to use and follow the paths to replace the archives in your resources folder!
    - If you gonna use the **vrp_advanced_garages**, you need to change **LSC_Config.vrp_adv_garages** to **true** on the **vrp_lscustoms/lsconfig.lua** archive! 
-
-
    ```lua
        LSC_Config.vrp_adv_garages = true
    ```
@@ -25,7 +23,7 @@
    ```
    - **Model:** Vehicle model name that is going to be searched on the database.
    - **Entity:** Vehicle entity.
-    
+   
 
 # vrp_lscustoms (PT-BR)
 
@@ -38,7 +36,7 @@
    ```lua
        LSC_Config.vrp_adv_garages = true
    ```
-      
+
 **Como usar em outros resources:**
 
    - Para instalar em outros resources você precisa adicionar o código abaixo na funcão de spawnar o veículo do resource que você quer usar:
