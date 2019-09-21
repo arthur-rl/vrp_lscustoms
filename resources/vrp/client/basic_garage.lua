@@ -1,36 +1,19 @@
--- decorators
-DecorRegister("vRP_owner", 3)
-DecorRegister("vRP_vmodel", 3)
 
-local veh_models = {}
 local vehicles = {}
 
-function tvRP.setVehicleModelsIndex(index)
-  veh_models = index
+function tvRP.spawnGarageVehicle(vtype,name,pos) -- vtype is the vehicle type (one vehicle per type allowed at the same time)
 
-  -- generate bidirectional keys
-  for k,v in pairs(veh_models) do
-    veh_models[v] = k
+  local vehicle = vehicles[vtype]
+  if vehicle and not IsVehicleDriveable(vehicle[3]) then -- precheck if vehicle is undriveable
+    -- despawn vehicle
+    SetVehicleHasBeenOwnedByPlayer(vehicle[3],false)
+    Citizen.InvokeNative(0xAD738C3085FE7E11, vehicle[3], false, true) -- set not as mission entity
+    SetVehicleAsNoLongerNeeded(Citizen.PointerValueIntInitialized(vehicle[3]))
+    Citizen.InvokeNative(0xEA386986E786A54F, Citizen.PointerValueIntInitialized(vehicle[3]))
+    vehicles[vtype] = nil
   end
-end
 
--- veh: vehicle game id
--- return owner_user_id, vname (or nil if not managed by vRP)
-function tvRP.getVehicleInfos(veh)
-  if veh and DecorExistOn(veh, "vRP_owner") and DecorExistOn(veh, "vRP_vmodel") then
-    local user_id = DecorGetInt(veh, "vRP_owner")
-    local vmodel = DecorGetInt(veh, "vRP_vmodel")
-
-    local vname = veh_models[vmodel]
-    if vname then
-      return user_id, vname
-    end
-  end
-end
-
-function tvRP.spawnGarageVehicle(name,pos) -- one vehicle per vname/model allowed at the same time
-
-  local vehicle = vehicles[name]
+  vehicle = vehicles[vtype]
   if vehicle == nil then
     -- load vehicle model
     local mhash = GetHashKey(name)
@@ -57,31 +40,39 @@ function tvRP.spawnGarageVehicle(name,pos) -- one vehicle per vname/model allowe
       Citizen.InvokeNative(0xAD738C3085FE7E11, nveh, true, true) -- set as mission entity
       SetVehicleHasBeenOwnedByPlayer(nveh,true)
 
-      -- set decorators
-      DecorSetInt(veh, "vRP_owner", tvRP.getUserId())
-      DecorSetInt(veh, "vRP_vmodel", veh_models[name])
+      if not cfg.vehicle_migration then
+        local nid = NetworkGetNetworkIdFromEntity(nveh)
+        SetNetworkIdCanMigrate(nid,false)
+      end
 
-      vehicles[name] = {name,nveh} -- set current vehicule
+      vehicles[vtype] = {vtype,name,nveh} -- set current vehicule
 
       SetModelAsNoLongerNeeded(mhash)
 
       TriggerServerEvent("LSC:applyModifications", name, nveh)
     end
   else
-    tvRP.notify("This vehicle is already out.")
+    tvRP.notify("You can only have one "..vtype.." vehicule out.")
   end
 end
 
-function tvRP.despawnGarageVehicle(name)
-  local vehicle = vehicles[name]
+function tvRP.despawnGarageVehicle(vtype,max_range)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    -- remove vehicle
-    SetVehicleHasBeenOwnedByPlayer(vehicle[2],false)
-    Citizen.InvokeNative(0xAD738C3085FE7E11, vehicle[2], false, true) -- set not as mission entity
-    SetVehicleAsNoLongerNeeded(Citizen.PointerValueIntInitialized(vehicle[2]))
-    Citizen.InvokeNative(0xEA386986E786A54F, Citizen.PointerValueIntInitialized(vehicle[2]))
-    vehicles[name] = nil
-    tvRP.notify("Vehicle stored.")
+    local x,y,z = table.unpack(GetEntityCoords(vehicle[3],true))
+    local px,py,pz = tvRP.getPosition()
+
+    if GetDistanceBetweenCoords(x,y,z,px,py,pz,true) < max_range then -- check distance with the vehicule
+      -- remove vehicle
+      SetVehicleHasBeenOwnedByPlayer(vehicle[3],false)
+      Citizen.InvokeNative(0xAD738C3085FE7E11, vehicle[3], false, true) -- set not as mission entity
+      SetVehicleAsNoLongerNeeded(Citizen.PointerValueIntInitialized(vehicle[3]))
+      Citizen.InvokeNative(0xEA386986E786A54F, Citizen.PointerValueIntInitialized(vehicle[3]))
+      vehicles[vtype] = nil
+      tvRP.notify("Vehicle stored.")
+    else
+      tvRP.notify("Too far away from the vehicle.")
+    end
   end
 end
 
@@ -120,19 +111,6 @@ function tvRP.getNearestVehicle(radius)
   end
 end
 
--- try to re-own the nearest vehicle
-function tvRP.tryOwnNearestVehicle(radius)
-  local veh = tvRP.getNearestVehicle(radius)
-  if veh then
-    local user_id, vname = tvRP.getVehicleInfos(veh)
-    if user_id and user_id == tvRP.getUserId() then
-      if vehicles[vname] ~= veh then
-        vehicles[vname] = veh
-      end
-    end
-  end
-end
-
 function tvRP.fixeNearestVehicle(radius)
   local veh = tvRP.getNearestVehicle(radius)
   if IsEntityAVehicle(veh) then
@@ -158,37 +136,23 @@ function tvRP.getVehicleAtPosition(x,y,z)
   return ent
 end
 
--- return ok,name
+-- return ok,vtype,name
 function tvRP.getNearestOwnedVehicle(radius)
-  tvRP.tryOwnNearestVehicle(radius) -- get back network lost vehicles
-
   local px,py,pz = tvRP.getPosition()
-  local min_dist
-  local min_k
   for k,v in pairs(vehicles) do
-    local x,y,z = table.unpack(GetEntityCoords(v[2],true))
+    local x,y,z = table.unpack(GetEntityCoords(v[3],true))
     local dist = GetDistanceBetweenCoords(x,y,z,px,py,pz,true)
-
-    if dist <= radius+0.0001 then
-      if not min_dist or dist < min_dist then
-        min_dist = dist
-        min_k = k
-      end
-    end
+    if dist <= radius+0.0001 then return true,v[1],v[2] end
   end
 
-  if min_k then
-    return true,min_k
-  end
-
-  return false,""
+  return false,"",""
 end
 
 -- return ok,x,y,z
 function tvRP.getAnyOwnedVehiclePosition()
   for k,v in pairs(vehicles) do
-    if IsEntityAVehicle(v[2]) then
-      local x,y,z = table.unpack(GetEntityCoords(v[2],true))
+    if IsEntityAVehicle(v[3]) then
+      local x,y,z = table.unpack(GetEntityCoords(v[3],true))
       return true,x,y,z
     end
   end
@@ -197,22 +161,24 @@ function tvRP.getAnyOwnedVehiclePosition()
 end
 
 -- return x,y,z
-function tvRP.getOwnedVehiclePosition(name)
-  local vehicle = vehicles[name]
+function tvRP.getOwnedVehiclePosition(vtype)
+  local vehicle = vehicles[vtype]
   local x,y,z = 0,0,0
 
   if vehicle then
-    x,y,z = table.unpack(GetEntityCoords(vehicle[2],true))
+    x,y,z = table.unpack(GetEntityCoords(vehicle[3],true))
   end
 
   return x,y,z
 end
 
--- return owned vehicle handle or nil if not found
-function tvRP.getOwnedVehicleHandle(name)
-  local vehicle = vehicles[name]
+-- return ok, vehicule network id
+function tvRP.getOwnedVehicleId(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    return vehicle[2]
+    return true, NetworkGetNetworkIdFromEntity(vehicle[3])
+  else
+    return false, 0
   end
 end
 
@@ -225,70 +191,65 @@ function tvRP.ejectVehicle()
   end
 end
 
-function tvRP.isInVehicle()
-  local ped = GetPlayerPed(-1)
-  return IsPedSittingInAnyVehicle(ped) 
-end
-
 -- vehicle commands
-function tvRP.vc_openDoor(name, door_index)
-  local vehicle = vehicles[name]
+function tvRP.vc_openDoor(vtype, door_index)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    SetVehicleDoorOpen(vehicle[2],door_index,0,false)
+    SetVehicleDoorOpen(vehicle[3],door_index,0,false)
   end
 end
 
-function tvRP.vc_closeDoor(name, door_index)
-  local vehicle = vehicles[name]
+function tvRP.vc_closeDoor(vtype, door_index)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    SetVehicleDoorShut(vehicle[2],door_index)
+    SetVehicleDoorShut(vehicle[3],door_index)
   end
 end
 
-function tvRP.vc_detachTrailer(name)
-  local vehicle = vehicles[name]
+function tvRP.vc_detachTrailer(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    DetachVehicleFromTrailer(vehicle[2])
+    DetachVehicleFromTrailer(vehicle[3])
   end
 end
 
-function tvRP.vc_detachTowTruck(name)
-  local vehicle = vehicles[name]
+function tvRP.vc_detachTowTruck(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    local ent = GetEntityAttachedToTowTruck(vehicle[2])
+    local ent = GetEntityAttachedToTowTruck(vehicle[3])
     if IsEntityAVehicle(ent) then
-      DetachVehicleFromTowTruck(vehicle[2],ent)
+      DetachVehicleFromTowTruck(vehicle[3],ent)
     end
   end
 end
 
-function tvRP.vc_detachCargobob(name)
-  local vehicle = vehicles[name]
+function tvRP.vc_detachCargobob(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    local ent = GetVehicleAttachedToCargobob(vehicle[2])
+    local ent = GetVehicleAttachedToCargobob(vehicle[3])
     if IsEntityAVehicle(ent) then
-      DetachVehicleFromCargobob(vehicle[2],ent)
+      DetachVehicleFromCargobob(vehicle[3],ent)
     end
   end
 end
 
-function tvRP.vc_toggleEngine(name)
-  local vehicle = vehicles[name]
+function tvRP.vc_toggleEngine(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    local running = Citizen.InvokeNative(0xAE31E7DF9B5B132E,vehicle[2]) -- GetIsVehicleEngineRunning
-    SetVehicleEngineOn(vehicle[2],not running,true,true)
+    local running = Citizen.InvokeNative(0xAE31E7DF9B5B132E,vehicle[3]) -- GetIsVehicleEngineRunning
+    SetVehicleEngineOn(vehicle[3],not running,true,true)
     if running then
-      SetVehicleUndriveable(vehicle[2],true)
+      SetVehicleUndriveable(vehicle[3],true)
     else
-      SetVehicleUndriveable(vehicle[2],false)
+      SetVehicleUndriveable(vehicle[3],false)
     end
   end
 end
 
-function tvRP.vc_toggleLock(name)
-  local vehicle = vehicles[name]
+function tvRP.vc_toggleLock(vtype)
+  local vehicle = vehicles[vtype]
   if vehicle then
-    local veh = vehicle[2]
+    local veh = vehicle[3]
     local locked = GetVehicleDoorLockStatus(veh) >= 2
     if locked then -- unlock
       SetVehicleDoorsLockedForAllPlayers(veh, false)

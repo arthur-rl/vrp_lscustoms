@@ -5,15 +5,7 @@ Credits - MythicalBro and マーモット#2533 for the vRP version and some bug 
 Do not reupload/re release any part of this script without my permission
 ]]
 
-local Proxy = module("vrp", "lib/Proxy")
-
 local vRP = Proxy.getInterface("vRP")
-
-local vRP_adv_garages
-
-if LSC_Config.vrp_adv_garages then
-	vRP_adv_garages = Proxy.getInterface("vrp_adv_garages")
-end
 
 local inside = false
 local currentpos = nil
@@ -25,7 +17,7 @@ local garages = {
 	[3] = { locked = false, camera = {x = -1154.902, y = -2011.438, z = 13.18, heading = 95.49}, driveout = {x = -1150.379,y = -1995.845, z = 12.465, heading = 313.594}, drivein = {x = -1150.26,y = -1995.642, z = 12.466, heading = 136.859}, outside = {x = -1140.352,y = -1985.89, z = 12.45, heading = 314.406}, inside = {x = -1155.077,y = -2006.61, z = 12.465, heading = 162.58}},
 	[4] = { locked = false, camera = {x = 1177.98, y = 2636.059, z = 37.754, heading = 37.082}, driveout = {x = 1175.003,y = 2642.175, z = 37.045, heading = 0.759}, drivein = {x = 1174.701,y = 2643.764, z = 37.048, heading = 178.119}, outside = {x = 1175.565,y = 2652.819, z = 37.941, heading = 351.579}, inside = {x = 1174.823,y = 2637.807, z = 37.045, heading = 181.19}},
 	[5] = { locked = false, camera = {x = 105.825, y = 6627.562, z = 31.787, heading = 266.692}, driveout = {x = 112.326,y = 6625.148, z = 31.073, heading = 224.641}, drivein = {x = 112.738,y = 6624.644, z = 31.072, heading = 44.262}, outside = {x = 118.493,y = 6618.897, z = 31.13, heading = 224.701}, inside = {x = 108.842,y = 6628.447, z = 31.072, heading = 45.504}},
-	[6] = { locked = false, camera = {x = -215.518, y = -1329.135, z = 30.89, heading = 329.092}, driveout = {x = -205.935,y = -1316.642, z = 30.176, heading = 356.495}, drivein = {x = -205.626,y = -1314.99, z = 30.247, heading = 179.395}, outside = {x = -205.594,y = -1304.085, z = 30.614, heading = 359.792}, inside = {x = -212.368,y = -1325.486, z = 30.176, heading = 141.107} }
+	[6]= { locked = false, camera = {x = -215.518, y = -1329.135, z = 30.89, heading = 329.092}, driveout = {x = -205.935,y = -1316.642, z = 30.176, heading = 356.495}, drivein = {x = -205.626,y = -1314.99, z = 30.247, heading = 179.395}, outside = {x = -205.594,y = -1304.085, z = 30.614, heading = 359.792}, inside = {x = -212.368,y = -1325.486, z = 30.176, heading = 141.107} }
 }
 
 local Menu = SetMenu()
@@ -574,10 +566,7 @@ local function DriveOutOfGarage(pos)
 		pos = currentpos.driveout
 		
 		--The vehicle customization is finished, so we send to server our vehicle data
-		local ok, model, veh_type = vRP.getNearestOwnedVehicle(1)
-		if vRP_adv_garages and not ok then
-			ok, veh_type, model = vRP_adv_garages.getNearestOwnedVehicle(1)
-		end
+		local ok, veh_type, model = vRP.getNearestOwnedVehicle({1})
 		myveh.model = model
 
 		if ok then
