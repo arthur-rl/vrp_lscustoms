@@ -33,7 +33,7 @@
 
 **Como instalar:**
     
-   - Coloque a pasta **vrp_lscustoms** dentro de sua pasta resource e starte ela no server.cfg. Depois vá nessa pasta resources e selecione os resources que você quer usar e segui os diretórios para substituir os arquivos na sua pasta resources!
+   - Coloque a pasta **vrp_lscustoms** dentro de sua pasta resources e starte ela no server.cfg. Depois vá na pasta resources e selecione os resources que você quer usar e siga os diretórios para substituir os arquivos na sua pasta resources!
    - Se você vai usar o **vrp_advanced_garages**, você precisa mudar **LSC_Config.vrp_adv_garages** para **true** no arquivo **vrp_lscustoms/lsconfig.lua**!
    ```lua
        LSC_Config.vrp_adv_garages = true
@@ -46,7 +46,7 @@
        TriggerServerEvent("LSC:applyModifications", modelo, entitidade)
    ```
    - **Modelo:** Nome do modelo do veículo que irá ser pesquisado na database.
-   - **Entidade: ** Entidade do veículo.
+   - **Entidade:** Entidade do veículo.
 
 
     
