@@ -96,7 +96,7 @@ LSC_Config.prices = {
 	--Chrome 
 	chrome = {
 		colors = {
-			{name = "Chrome", colorindex = 120}
+			{name = "Chrome Color", colorindex = 120}
 		},
 		price = 1000
 	},
@@ -125,7 +125,7 @@ LSC_Config.prices = {
 	--Chrome 
 	chrome2 = {
 		colors = {
-			{name = "Chrome", colorindex = 120}
+			{name = "Chrome Color", colorindex = 120}
 		},
 		price = 1000
 	},
