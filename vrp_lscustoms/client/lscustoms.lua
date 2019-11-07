@@ -7,13 +7,7 @@ Do not reupload/re release any part of this script without my permission
 
 local Proxy = module("vrp", "lib/Proxy")
 
-local vRP = Proxy.getInterface("vRP")
-
-local vRP_adv_garages
-
-if LSC_Config.vrp_adv_garages then
-	vRP_adv_garages = Proxy.getInterface("vrp_adv_garages")
-end
+local vRP_adv_garages = Proxy.getInterface("vrp_adv_garages")
 
 local inside = false
 local currentpos = nil
@@ -574,13 +568,10 @@ local function DriveOutOfGarage(pos)
 		pos = currentpos.driveout
 		
 		--The vehicle customization is finished, so we send to server our vehicle data
-		local ok, model = vRP.getNearestOwnedVehicle(1)
-		if vRP_adv_garages and not ok then
-			ok, model = vRP_adv_garages.getNearestOwnedVehicle(1)
-		end
-		myveh.model = model
+		ok, model = vRP_adv_garages.getNearestOwnedVehicle(1)
 
 		if ok then
+			myveh.model = model
 			TriggerServerEvent("LSC:finished", myveh)
 		end
 		
