@@ -574,9 +574,9 @@ local function DriveOutOfGarage(pos)
 		pos = currentpos.driveout
 		
 		--The vehicle customization is finished, so we send to server our vehicle data
-		local ok, model, veh_type = vRP.getNearestOwnedVehicle(1)
+		local ok, model = vRP.getNearestOwnedVehicle(1)
 		if vRP_adv_garages and not ok then
-			ok, veh_type, model = vRP_adv_garages.getNearestOwnedVehicle(1)
+			ok, model = vRP_adv_garages.getNearestOwnedVehicle(1)
 		end
 		myveh.model = model
 

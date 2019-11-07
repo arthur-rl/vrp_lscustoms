@@ -1,1053 +1,1188 @@
---[[
-    FiveM Scripts
-    Copyright C 2018  Sighmir
+local Tunnel = module("vrp","lib/Tunnel")
+local Proxy = module("vrp","lib/Proxy")
+local Tools = module("vrp","lib/Tools")
 
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
-    at your option any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-]]
-
--- vRP TUNNEL/PROXY
-local Tunnel = module("vrp", "lib/Tunnel")
-local Proxy = module("vrp", "lib/Proxy")
 vRP = Proxy.getInterface("vRP")
 vRPclient = Tunnel.getInterface("vRP")
+vRPgarage = Tunnel.getInterface("vrp_adv_garages")
 
--- RESOURCE TUNNEL/PROXY
-vRPg = {}
-Tunnel.bindInterface("vrp_adv_garages",vRPg)
-Proxy.addInterface("vrp_adv_garages",vRPg)
-Gclient = Tunnel.getInterface("vrp_adv_garages")
-
--- Prepare
 vRP._prepare("vRP/move_vehicle","UPDATE vrp_user_vehicles SET user_id = @tuser_id WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/add_vehicle","INSERT IGNORE INTO vrp_user_vehicles(user_id,vehicle) VALUES(@user_id,@vehicle)")
+vRP._prepare("vRP/remove_vehicle","DELETE FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/get_vehicles","SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id")
+vRP._prepare("vRP/get_vehicle","SELECT vehicle FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/get_detido","SELECT * FROM vrp_user_vehicles WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/set_detido","UPDATE vrp_user_vehicles SET detido = @detido, time = @time WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/get_maxcars","SELECT COUNT(vehicle) as quantidade FROM vrp_user_vehicles WHERE user_id = @user_id")
+vRP._prepare("vRP/set_vehstatus","UPDATE vrp_user_vehicles SET engine = @engine, body = @body, fuel = @fuel WHERE user_id = @user_id AND vehicle = @vehicle")
+vRP._prepare("vRP/count_vehicle","SELECT COUNT(*) as qtd FROM vrp_user_vehicles WHERE vehicle = @vehicle")
 
--- CFG
-local cfg = module("vrp_adv_garages", "cfg/garages")
+local cfg = module("vrp_adv_garages","cfg/garages")
 local cfg_inventory = module("vrp","cfg/inventory")
 
--- LANG
-Luang = module("vrp", "lib/Luang")
-Lang = Luang()
-Lang:loadLocale(cfg.lang, module("vrp", "cfg/lang/"..cfg.lang) or {})
-Lang:loadLocale(cfg.lang, module("vrp_adv_garages", "cfg/lang/"..cfg.lang) or {})
-lang = Lang.lang[cfg.lang]
+local garage_types = cfg.garage_types
+local totalgaragem = 3
 
-local adv_garages = cfg.adv_garages
-local items = cfg.items
-local cooldown = {}
-  
-Citizen.CreateThread(function()
-  for k,v in pairs(items) do
-    vRP.defInventoryItem(k,v[1],v[2],v[3],v[4])
-  end
+local veh_models_ids = Tools.newIDGenerator()
+local veh_models = {}
+
+for group,vehicles in pairs(garage_types) do
+	for veh_model,_ in pairs(vehicles) do
+		if not veh_models[veh_model] then
+			veh_models[veh_model] = veh_models_ids:gen()
+		end
+	end
+end
+
+local carros = {
+	["blista"] = { price = 60000 },
+	["brioso"] = { price = 30000 },
+	["dilettante"] = { price = 60000 },
+	["issi2"] = { price = 90000 },
+	["panto"] = { price = 5000 },
+	["prairie"] = { price = 10000 },
+	["rhapsody"] = { price = 7000 },
+	["cogcabrio"] = { price = 120000 },
+	["exemplar"] = { price = 80000 },
+	["f620"] = { price = 55000 },
+	["felon"] = { price = 70000 },
+	["ingot"] = { price = 160000 },
+	["felon2"] = { price = 80000 },
+	["jackal"] = { price = 60000 },
+	["oracle"] = { price = 60000 },
+	["oracle2"] = { price = 80000 },
+	["sentinel"] = { price = 50000 },
+	["sentinel2"] = { price = 60000 },
+	["windsor"] = { price = 150000 },
+	["windsor2"] = { price = 170000 },
+	["zion"] = { price = 50000 },
+	["zion2"] = { price = 60000 },
+	["blade"] = { price = 100000 },
+	["buccaneer"] = { price = 120000 },
+	["buccaneer2"] = { price = 240000 },
+	["primo"] = { price = 120000 },
+	["primo2"] = { price = 240000 },
+	["chino"] = { price = 120000 },
+	["chino2"] = { price = 240000 },
+	["coquette3"] = { price = 170000 },
+	["dominator"] = { price = 180000 },
+	["dukes"] = { price = 150000 },
+	["faction"] = { price = 150000 },
+	["faction2"] = { price = 200000 },
+	["faction3"] = { price = 350000 },
+	["gauntlet"] = { price = 145000 },
+	["hermes"] = { price = 280000 },
+	["hotknife"] = { price = 180000 },
+	["moonbeam"] = { price = 180000 },
+	["moonbeam2"] = { price = 220000 },
+	["nightshade"] = { price = 270000 },
+	["picador"] = { price = 150000 },
+	["ratloader2"] = { price = 180000 },
+	["ruiner"] = { price = 150000 },
+	["sabregt"] = { price = 240000 },
+	["sabregt2"] = { price = 150000 },
+	["slamvan"] = { price = 150000 },
+	["slamvan2"] = { price = 190000 },
+	["slamvan3"] = { price = 200000 },
+	["stalion"] = { price = 150000 },
+	["tampa"] = { price = 170000 },
+	["vigero"] = { price = 170000 },
+	["virgo"] = { price = 150000 },
+	["virgo2"] = { price = 250000 },
+	["virgo3"] = { price = 180000 },
+	["voodoo"] = { price = 220000 },
+	["yosemite"] = { price = 350000 },
+	["bfinjection"] = { price = 80000 },
+	["bifta"] = { price = 190000 },
+	["bodhi2"] = { price = 170000 },
+	["dubsta3"] = { price = 240000 },
+	["mesa3"] = { price = 160000 },
+	["rancherxl"] = { price = 200000 },
+	["rebel"] = { price = 220000 },
+	["rebel2"] = { price = 250000 },
+	["riata"] = { price = 250000 },
+	["dloader"] = { price = 150000 },
+	["sandking"] = { price = 350000 },
+	["sandking2"] = { price = 300000 },
+	["baller"] = { price = 120000 },
+	["baller2"] = { price = 130000 },
+	["baller3"] = { price = 140000 },
+	["baller4"] = { price = 150000 },
+	["baller5"] = { price = 300000 },
+	["baller6"] = { price = 310000 },
+	["bjxl"] = { price = 100000 },
+	["cavalcade"] = { price = 110000 },
+	["cavalcade2"] = { price = 130000 },
+	["contender"] = { price = 240000 },
+	["dubsta"] = { price = 150000 },
+	["dubsta2"] = { price = 180000 },
+	["fq2"] = { price = 100000 },
+	["granger"] = { price = 280000 },
+	["gresley"] = { price = 150000 },
+	["habanero"] = { price = 100000 },
+	["seminole"] = { price = 110000 },
+	["serrano"] = { price = 150000 },
+	["xls"] = { price = 150000 },
+	["xls2"] = { price = 350000 },
+	["asea"] = { price = 50000 },
+	["asterope"] = { price = 60000 },
+	["cog55"] = { price = 200000 },
+	["cog552"] = { price = 350000 },
+	["cognoscenti"] = { price = 250000 },
+	["cognoscenti2"] = { price = 350000 },
+	["stanier"] = { price = 60000 },
+	["stratum"] = { price = 70000 },
+	["superd"] = { price = 200000 },
+	["surge"] = { price = 100000 },
+	["tailgater"] = { price = 100000 },
+	["warrener"] = { price = 90000 },
+	["washington"] = { price = 120000 },
+	["alpha"] = { price = 160000 },
+	["banshee"] = { price = 240000 },
+	["bestiagts"] = { price = 220000 },
+	["blista2"] = { price = 50000 },
+	["blista3"] = { price = 70000 },
+	["buffalo"] = { price = 240000 },
+	["buffalo2"] = { price = 240000 },
+	["carbonizzare"] = { price = 250000 },
+	["comet2"] = { price = 200000 },
+	["comet3"] = { price = 230000 },
+	["coquette"] = { price = 200000 },
+	["elegy"] = { price = 260000 },
+	["elegy2"] = { price = 280000 },
+	["feltzer2"] = { price = 200000 },
+	["furoregt"] = { price = 250000 },
+	["fusilade"] = { price = 180000 },
+	["futo"] = { price = 150000 },
+	["jester"] = { price = 120000 },
+	["khamelion"] = { price = 180000 },
+	["kuruma"] = { price = 240000 },
+	["massacro"] = { price = 290000 },
+	["ninef"] = { price = 250000 },
+	["ninef2"] = { price = 250000 },
+	["omnis"] = { price = 210000 },
+	["pariah"] = { price = 400000 },
+	["penumbra"] = { price = 120000 },
+	["raiden"] = { price = 210000 },
+	["rapidgt"] = { price = 220000 },
+	["rapidgt2"] = { price = 240000 },
+	["ruston"] = { price = 300000 },
+	["schafter3"] = { price = 180000 },
+	["schafter4"] = { price = 190000 },
+	["schwarzer"] = {  price = 150000 },
+	["sentinel3"] = { price = 150000 },
+	["seven70"] = { price = 300000 },
+	["specter"] = { price = 280000 },
+	["specter2"] = { price = 310000 },
+	["streiter"] = { price = 200000 },
+	["sultan"] = { price = 150000 },
+	["surano"] = { price = 270000 },
+	["tampa2"] = { price = 180000 },
+	["tropos"] = { price = 150000 },
+	["verlierer2"] = { price = 330000 },
+	["btype"] = { price = 320000 },
+	["btype2"] = { price = 400000 },
+	["btype3"] = { price = 340000 },
+	["casco"] = { price = 310000 },
+	["cheetah"] = { price = 370000 },
+	["coquette2"] = { price = 250000 },
+	["feltzer3"] = { price = 200000 },
+	["gt500"] = { price = 250000 },
+	["infernus2"] = { price = 250000 },
+	["jb700"] = { price = 200000 },
+	["mamba"] = { price = 240000 },
+	["manana"] = { price = 120000 },
+	["monroe"] = { price = 240000 },
+	["peyote"] = { price = 150000 },
+	["pigalle"] = { price = 250000 },
+	["rapidgt3"] = { price = 190000 },
+	["retinue"] = { price = 150000 },
+	["stinger"] = { price = 200000 },
+	["stingergt"] = { price = 230000 },
+	["torero"] = { price = 160000 },
+	["tornado"] = { price = 140000 },
+	["tornado2"] = { price = 160000 },
+	["tornado5"] = { price = 250000 },
+	["turismo2"] = { price = 250000 },
+	["viseris"] = {  price = 210000 },
+	["ztype"] = { price = 400000 },
+	["adder"] = { price = 500000 },
+	["autarch"] = { price = 610000 },
+	["banshee2"] = {  price = 300000 },
+	["bullet"] = { price = 350000 },
+	["cheetah2"] = { price = 210000 },
+	["entityxf"] = { price = 400000 },
+	["fmj"] = { price = 450000 },
+	["gp1"] = { price = 430000 },
+	["infernus"] = { price = 410000 },
+	["nero"] = { price = 390000 },
+	["nero2"] = { price = 420000 },
+	["osiris"] = { price = 400000 },
+	["penetrator"] = { price = 420000 },
+	["pfister811"] = { price = 460000 },
+	["reaper"] = { price = 500000 },
+	["sc1"] = { price = 430000 },
+	["sultanrs"] = { price = 300000 },
+	["t20"] = { price = 500000 },
+	["tempesta"] = { price = 520000 },
+	["turismor"] = { price = 500000 },
+	["tyrus"] = { price = 500000 },
+	["vacca"] = { price = 500000 },
+	["visione"] = { price = 600000 },
+	["voltic"] = { price = 380000 },
+	["zentorno"] = { price = 700000 },
+	["sadler"] = { price = 180000 },
+	["bison"] = { price = 200000 },
+	["bison2"] = { price = 180000 },
+	["bobcatxl"] = { price = 240000 },
+	["burrito"] = { price = 240000 },
+	["burrito2"] = { price = 240000 },
+	["burrito3"] = { price = 240000 },
+	["burrito4"] = { price = 240000 },
+	["minivan"] = { price = 100000 },
+	["minivan2"] = { price = 200000 },
+	["paradise"] = { price = 240000 },
+	["pony"] = { price = 240000 },
+	["pony2"] = { price = 240000 },
+	["rumpo"] = { price = 240000 },
+	["rumpo2"] = { price = 240000 },
+	["rumpo3"] = { price = 250000 },
+	["speedo"] = { price = 240000 },
+	["surfer"] = { price = 50000 },
+	["youga"] = { price = 240000 },
+	["youga2"] = { price = 240000 },
+	["huntley"] = { price = 100000 },
+	["landstalker"] = { price = 130000 },
+	["mesa"] = { price = 90000 },
+	["patriot"] = { price = 250000 },
+	["radi"] = { price = 100000 },
+	["rocoto"] = { price = 100000 },
+	["tyrant"] = { price = 600000 },
+	["entity2"] = { price = 480000 },
+	["cheburek"] = { price = 150000 },
+	["hotring"] = { price = 300000 },
+	["jester3"] = { price = 240000 },
+	["flashgt"] = { price = 320000 },
+	["ellie"] = { price = 300000 },
+	["michelli"] = { price = 160000 },
+	["fagaloa"] = { price = 300000 },
+	["dominator3"] = { price = 300000 },
+	["issi3"] = { price = 160000 },
+	["taipan"] = { price = 500000 },
+	["gb200"] = { price = 170000 },
+	["stretch"] = { price = 500000 },
+	["guardian"] = { price = 500000 },
+	["kamacho"] = { price = 400000 },
+	["neon"] = { price = 300000 },
+	["cyclone"] = { price = 800000 },
+	["italigtb"] = { price = 520000 },
+	["italigtb2"] = { price = 530000 },
+	["vagner"] = { price = 590000 },
+	["xa21"] = { price = 550000 },
+	["tezeract"] = { price = 800000 },
+	["prototipo"] = { price = 900000 },
+	["ferrariitalia"] = { price = 1500000 },
+	["fordmustang"] = { price = 1000000 },
+	["nissangtr"] = { price = 1150000 },
+	["nissangtrnismo"] = { price = 1200000 },
+	["teslaprior"] = { price = 700000 },
+	["nissanskyliner34"] = { price = 1100000 },
+	["audirs6"] = { price = 850000 },
+	["bmwm3f80"] = { price = 900000 },
+	["bmwm4gts"] = { price = 950000 },
+	["lancerevolutionx"] = { price = 850000 },
+	["toyotasupra"] = { price = 1050000 },
+	["nissan370z"] = { price = 550000 },
+	["lamborghinihuracan"] = { price = 1300000 },
+	["dodgechargersrt"] = { price = 1400000 },
+	["patriot2"] = { price = 550000 },
+	["speedo4"] = { price = 240000 },
+	["stafford"] = { price = 400000 },
+	["swinger"] = { price = 250000 },
+	["brutus"] = { price = 350000 },
+	["clique"] = { price = 360000 },
+	["deveste"] = { price = 800000 },
+	["deviant"] = { price = 300000 },
+	["impaler"] = { price = 300000 },
+	["imperator"] = { price = 400000 },
+	["italigto"] = { price = 700000 },
+	["schlagen"] = { price = 600000 },
+	["toros"] = { price = 310000 },
+	["tulip"] = { price = 300000 },
+	["vamos"] = { price = 320000 },
+	["mazdarx7"] = { price = 1000000 },
+	["akuma"] = { price = 420000 },
+	["avarus"] = { price = 350000 },
+	["bagger"] = { price = 240000 },
+	["bati"] = { price = 300000 },
+	["bf400"] = { price = 260000 },
+	["carbonrs"] = { price = 300000 },
+	["chimera"] = { price = 280000 },
+	["cliffhanger"] = { price = 250000 },
+	["daemon"] = { price = 200000 },
+	["daemon2"] = { price = 200000 },
+	["defiler"] = { price = 380000 },
+	["diablous"] = { price = 350000 },
+	["diablous2"] = { price = 380000 },
+	["double"] = { price = 300000 },
+	["enduro"] = { price = 160000 },
+	["esskey"] = { price = 260000 },
+	["faggio"] = { price = 4000 },
+	["faggio2"] = { price = 5000 },
+	["faggio3"] = { price = 5000 },
+	["fcr"] = { price = 320000 },
+	["fcr2"] = { price = 320000 },
+	["gargoyle"] = { price = 280000 },
+	["hakuchou"] = { price = 310000 },
+	["hakuchou2"] = { price = 450000 },
+	["hexer"] = { price = 180000 },
+	["innovation"] = { price = 210000 },
+	["lectro"] = { price = 310000 },
+	["manchez"] = { price = 290000 },
+	["nemesis"] = { price = 280000 },
+	["nightblade"] = { price = 340000 },
+	["pcj"] = { price = 180000 },
+	["ruffian"] = { price = 280000 },
+	["sanchez"] = { price = 150000 },
+	["sanchez2"] = { price = 150000 },
+	["sanctus"] = {  price = 350000 },
+	["sovereign"] = { price = 240000 },
+	["thrust"] = { price = 300000 },
+	["vader"] = { price = 280000 },
+	["vindicator"] = { price = 250000 },
+	["vortex"] = { price = 300000 },
+	["wolfsbane"] = { price = 230000 },
+	["zombiea"] = { price = 230000 },
+	["zombieb"] = { price = 235000 },
+	["blazer"] = { price = 200000 },
+	["blazer4"] = { price = 300000 },
+	["deathbike"] = { price = 350000 },
+	["shotaro"] = { price = 1000000 },
+	["coach"] = { price = 20000 },
+	["policiacharger2018"] = { price = 20000 },
+	["policiasilverado"] = { price = 20000 },
+	["policiatahoe"] = { price = 20000 },
+	["policiataurus"] = { price = 20000 },
+	["policiavictoria"] = { price = 20000 },
+	["policiabmwr1200"] = { price = 20000 },
+	["policiaheli"] = { price = 20000 },
+	["paramedicoambu"] = { price = 20000 },
+	["paramedicocharger2014"] = { price = 20000 },
+	["paramedicoheli"] = { price = 20000 },
+	["pbus"] = { price = 20000 },
+	["flatbed"] = { price = 20000 },
+	["taxi"] = { price = 20000 },
+	["boxville2"] = { price = 20000 },
+	["tribike3"] = { price = 20000 },
+	["trash"] = { price = 20000 },
+	["trash2"] = { price = 20000 },
+	["scorcher"] = { price = 2000 },
+	["tribike"] = { price = 2000 },
+	["tribike2"] = { price = 2000 },
+	["fixter"] = { price = 2000 },
+	["cruiser"] = { price = 2000 },
+	["bmx"] = { price = 2000 },
+	["dinghy"] = { price = 100000 },
+	["jetmax"] = { price = 100000 },
+	["marquis"] = { price = 100000 },
+	["seashark3"] = { price = 100000 },
+	["speeder"] = { price = 100000 },
+	["speeder2"] = { price = 100000 },
+	["squalo"] = { price = 100000 },
+	["suntrap"] = { price = 100000 },
+	["toro"] = { price = 100000 },
+	["toro2"] = { price = 100000 },
+	["tropic"] = { price = 100000 },
+	["tropic2"] = { price = 100000 }
+}
+
+local idveh = {}
+RegisterServerEvent("vrp_adv_garages_id")
+AddEventHandler("vrp_adv_garages_id",function(netid,enginehealth,bodyhealth,fuel)
+	if idveh[netid] and netid ~= 0 then
+		local user_id = idveh[netid][1]
+		local carname = idveh[netid][2]
+		local player = vRP.getUserSource(user_id)
+		if player then
+			vRPgarage.despawnGarageVehicle2(player,carname)
+		end
+		local rows = vRP.query("vRP/get_detido",{ user_id = user_id, vehicle = carname })
+		if #rows > 0 then
+			vRP.execute("vRP/set_vehstatus",{ user_id = user_id, vehicle = carname, engine = parseInt(enginehealth), body = parseInt(bodyhealth), fuel = parseInt(fuel) })
+		end
+	end
 end)
 
-function vRPg.resetCooldown()
-  cooldown[source] = false
-end
--- build garages menus
-function vRPg.openGarage(source, gid, pos)
-  local user_id = vRP.getUserId(source)
-  local vehicles = adv_garages[gid]
-  local veh_type = vehicles._config.vtype
-  local gtypes = vehicles._config.gtype
-  local gpay = vehicles._config.gpay
-  local mods = vehicles._shop
-  local menu = {
-    name=lang.garage.title({gid}),
-    css={top = "75px", header_color="rgba(255,125,0,0.75)"}
-  }
-  
-  for _,gtype in pairs(gtypes) do
-	if gtype == "showroom" then
-      menu[lang.garage.showroom.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-        if user_id then
-          -- build nested menu
-          local kitems = {}
-		  local bought = false
-          local submenu = {name=lang.garage.title({lang.garage.buy.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-          submenu.onclose = function()
-            vRP.openMenu(source,menu)
-			if not bought then
-			  Gclient.despawnShowroomVehicle(source) 
-			end
-			Gclient.protectVehicle(source,false)
-          end
-      
-          local choose = function(player, choice, mod)
-            local vname = kitems[choice]
-            if vname then
-              -- buy vehicle
-              local vehicle = vehicles[vname]
-			  if vehicle then
-			    if mod == 0 then
-    		      local ok = vRP.request(source, lang.garage.buy.request(), 10)
-    		      if ok then
-				    local price = vehicle[2]
-				    local item = vehicle[4]
-				    local payment = false
-				    if item then
-                      payment = vRP.tryGetInventoryItem(user_id,item,price,true)
-				    elseif gpay == "bank" then
-                      payment = vRP.tryFullPayment(user_id,price)
-				    elseif gpay == "wallet" then
-                      payment = vRP.tryPayment(user_id,price)
-				    end
-				    if payment then
-					  local name, custom = Gclient.getVehicleMods(source, veh_type)
-			          -- print("custom:u"..user_id.."veh_"..vname.." = " .. json.encode(custom)) -- uncomment to see data structure upon save
-			          vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode(custom))
-					  vRP.execute("vRP/add_vehicle", {user_id = user_id, vehicle = vname})
-				      Gclient.despawnShowroomVehicle(source) 
-					  if not Gclient.spawnGarageVehicle(source,veh_type,vname,pos) then
-					  	vRPclient.notify(source,lang.garage.personal.out())
-					  end
-					  bought = true
-			          if not item and price > 0 then
-                        vRPclient.notify(source,lang.money.paid({price}))
-			          end
-                      vRP.closeMenu(source)
-                    else
-				      if not item then
-                        vRPclient.notify(source,lang.money.not_enough())
-					  end
-                    end
-				  else
-				    vRPclient.notify(source,lang.common.request_refused())
-				  end
-			    elseif not cooldown[source] then
-				  cooldown[source] = true
-                  if Gclient.spawnShowroomVehicle(source,vname, pos) then
-				    Gclient.protectVehicle(source,true)
-				  end
-			    end
-			  end
-            end
-          end
-          
-          -- get player owned vehicles (indexed by vehicle type name in lower case)
-          local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-          local pvehicles = {}
-          for k,v in pairs(_pvehicles) do
-            pvehicles[string.lower(v.vehicle)] = true
-          end
-      
-          -- for each existing vehicle in the garage group
-          for k,v in pairs(vehicles) do
-            if k ~= "_config" and k ~= "_shop" and pvehicles[string.lower(k)] == nil then -- not already owned
-              local price = math.max(v[2],0)
-			  if v[4] then
-                submenu[v[1]] = {choose,lang.garage.buy.item({vRP.getItemName(v[4]),price,v[3]})}
-			  else
-                submenu[v[1]] = {choose,lang.garage.buy.info({price,v[3]})}
-			  end
-              kitems[v[1]] = k
-            end
-          end
-      
-          vRP.openMenu(source,submenu)
-        end
-      end,lang.garage.showroom.description()}
-	elseif gtype == "personal" then 
-      menu[lang.garage.owned.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-        if user_id then
-          -- init tmpdata for rents
-          local tmpdata = vRP.getUserTmpTable(user_id)
-          if not tmpdata.rent_vehicles then
-            tmpdata.rent_vehicles = {}
-          end
-      
-      
-          -- build nested menu
-          local kitems = {}
-          local submenu = {name=lang.garage.title({lang.garage.owned.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-          submenu.onclose = function()
-            vRP.openMenu(source,menu)
-          end
-          
-          -- get player owned vehicles
-          local pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-          -- add rents to whitelist
-          for k,v in pairs(tmpdata.rent_vehicles) do
-            if v then -- check true, prevent future neolua issues
-              table.insert(pvehicles,{vehicle = k})
-            end
-          end
-      
-          local choose = function(player, choice)
-            local vname = kitems[choice]
-            if vname then
-              -- spawn vehicle
-              vRP.closeMenu(source)
-			  local data = vRP.getSData("custom:u"..user_id.."veh_"..vname)
-			  local custom = json.decode(data)
-			  if not cooldown[source] then
-				cooldown[source] = true
-                if not Gclient.spawnGarageVehicle(source,veh_type,vname,pos) then
-			      vRPclient.notify(source,lang.garage.personal.out())
-			    end
-			  end
-            end
-          end
-		  
-          for k,v in pairs(pvehicles) do
-		    local vehicle
-		    for x,garage in pairs(adv_garages) do
-			  if garage._config.vtype == veh_type then
-                vehicle = garage[v.vehicle]
-			  end
-			  if vehicle then break end
-			end
-			
-            if vehicle then
-              submenu[vehicle[1]] = {choose,vehicle[3]}
-              kitems[vehicle[1]] = v.vehicle
-            end
-          end
-      
-          vRP.openMenu(source,submenu)
-        end
-      end,lang.garage.owned.description()}
-	  
-      menu[lang.garage.store.title()] = {function(player,choice)
-        if Gclient.despawnGarageVehicle(source,veh_type,15) then
-		  vRPclient.notify(source,lang.garage.personal.stored())
-		else
-		  vRPclient.notify(source,lang.garage.personal.toofar())
-		end
-      end, lang.garage.store.description()}
-	elseif gtype == "store" then
-      menu[lang.garage.buy.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-        if user_id then
-          -- build nested menu
-          local kitems = {}
-          local submenu = {name=lang.garage.title({lang.garage.buy.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-          submenu.onclose = function()
-            vRP.openMenu(source,menu)
-          end
-      
-          local choose = function(player, choice)
-            local vname = kitems[choice]
-            if vname then
-              -- buy vehicle
-              local vehicle = vehicles[vname]
-              if vehicle then
-    		    local ok = vRP.request(source, lang.garage.buy.request(), 10)
-    		    if ok then
-			      local price = vehicle[2]
-				  local item = vehicle[4]
-				  local payment = false
-				  if item then
-                    payment = vRP.tryGetInventoryItem(user_id,item,price,true)
-				  elseif gpay == "bank" then
-                    payment = vRP.tryFullPayment(user_id,price)
-				  elseif gpay == "wallet" then
-                    payment = vRP.tryPayment(user_id,price)
-				  end
-				  if payment then
-                    vRP.execute("vRP/add_vehicle", {user_id = user_id, vehicle = vname})
-                    -- spawn vehicle
-                    if not Gclient.spawnGarageVehicle(source,veh_type,vname,pos) then
-			          vRPclient.notify(source,lang.garage.personal.out())
-			        end
-				    
-			        if not item and price > 0 then
-                      vRPclient.notify(source,lang.money.paid({price}))
-			        end
-                    vRP.closeMenu(source)
-                  else
-				    if not item then
-                      vRPclient.notify(source,lang.money.not_enough())
-				    end
-                  end
-				else
-				  vRPclient.notify(source,lang.common.request_refused())
-				end
-			  end
-            end
-          end
-          
-          -- get player owned vehicles (indexed by vehicle type name in lower case)
-          local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-          local pvehicles = {}
-          for k,v in pairs(_pvehicles) do
-            pvehicles[string.lower(v.vehicle)] = true
-          end
-      
-          -- for each existing vehicle in the garage group
-          for k,v in pairs(vehicles) do
-            if k ~= "_config" and k ~= "_shop" and pvehicles[string.lower(k)] == nil then -- not already owned
-              local price = math.max(v[2],0)
-			  if v[4] then
-                submenu[v[1]] = {choose,lang.garage.buy.item({vRP.getItemName(v[4]),price,v[3]})}
-			  else
-                submenu[v[1]] = {choose,lang.garage.buy.info({price,v[3]})}
-			  end
-              kitems[v[1]] = k
-            end
-          end
-      
-          vRP.openMenu(source,submenu)
-        end
-      end,lang.garage.buy.description()}
-      
-      menu[lang.garage.sell.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-        if user_id then
-      
-          -- build nested menu
-          local kitems = {}
-          local submenu = {name=lang.garage.title({lang.garage.sell.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-          submenu.onclose = function()
-            vRP.openMenu(source,menu)
-          end
-      
-          local choose = function(player, choice)
-            local vname = kitems[choice]
-            if vname then
-              -- sell vehicle
-              local vehicle = vehicles[vname]
-              if vehicle then      
-                local rows = vRP.query("vRP/get_vehicle", {user_id = user_id, vehicle = vname})
-                if #rows > 0 then -- has vehicle
-				  local price = math.ceil(vehicle[2]*cfg.sell_factor)
-				  local item = vehicle[4]
-				  if item then
-					vRP.giveInventoryItem(user_id,item,price,true)
-				  elseif gpay == "bank" then
-                    vRP.giveBankMoney(user_id,price)
-				  elseif gpay == "wallet" then
-                    vRP.giveMoney(user_id,price)
-				  end
-                  vRP.execute("vRP/remove_vehicle", {user_id = user_id, vehicle = vname})
-                  vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode())
-				  
-			      if not item and price > 0 then
-                    vRPclient.notify(source,lang.money.received({price}))
-			      end
-				  
-				  local vtype, vehicle = Gclient.isOwnedVehicleOut(source, vname)
-				  if vtype and vehicle then
-					if Gclient.despawnGarageVehicle(source,vtype,100000) then
-					  vRPclient.notify(source,lang.garage.personal.sold())
-					end
-				  end
-      
-                  vRP.closeMenu(source)
-                else
-                  vRPclient.notify(source,lang.common.not_found())
-                end
-              end
-            end
-          end
-          
-          -- get player owned vehicles (indexed by vehicle type name in lower case)
-          local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-          local pvehicles = {}
-          for k,v in pairs(_pvehicles) do
-            pvehicles[string.lower(v.vehicle)] = true
-          end
-      
-          -- for each existing vehicle in the garage group
-          for k,v in pairs(pvehicles) do
-            local vehicle = vehicles[k]
-            if vehicle then -- not already owned
-              local price = math.ceil(vehicle[2]*cfg.sell_factor)
-			  if vehicle[4] then
-                submenu[vehicle[1]] = {choose,lang.garage.buy.item({vRP.getItemName(vehicle[4]),price,vehicle[3]})}
-			  else
-                submenu[vehicle[1]] = {choose,lang.garage.buy.info({price,vehicle[3]})}
-			  end
-              kitems[vehicle[1]] = k
-            end
-          end
-      
-          vRP.openMenu(source,submenu)
-        end
-      end,lang.garage.sell.description()}
-    elseif gtype == "rental" then
-      menu[lang.garage.rent.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-        if user_id then
-          -- init tmpdata for rents
-          local tmpdata = vRP.getUserTmpTable(user_id)
-          if tmpdata.rent_vehicles == nil then
-            tmpdata.rent_vehicles = {}
-          end
-      
-          -- build nested menu
-          local kitems = {}
-          local submenu = {name=lang.garage.title({lang.garage.rent.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-          submenu.onclose = function()
-            vRP.openMenu(source,menu)
-          end
-      
-          local choose = function(player, choice)
-            local vname = kitems[choice]
-            if vname then
-              -- rent vehicle
-              local vehicle = vehicles[vname]
-              if vehicle then
-                local price = math.ceil(vehicle[2]*cfg.rent_factor)
-				local item = vehicle[4]
-				local payment = false
-				if item then
-                  payment = vRP.tryGetInventoryItem(user_id,item,price,true)
-				elseif gpay == "bank" then
-                  payment = vRP.tryFullPayment(user_id,price)
-				elseif gpay == "wallet" then
-                  payment = vRP.tryPayment(user_id,price)
-				end
-				if payment then
-                  -- add vehicle to rent tmp data
-                  tmpdata.rent_vehicles[vname] = true
-                  -- spawn vehicle
-                  if not Gclient.spawnGarageVehicle(source,veh_type,vname,pos) then
-			        vRPclient.notify(source,lang.garage.personal.out())
-			      end
-				  
-			      if not item and price > 0 then
-                    vRPclient.notify(source,lang.money.paid({price}))
-			      end
-      
-                  vRPclient.notify(source,lang.money.paid({price}))
-                  vRP.closeMenu(source)
-                else
-				  if not item then
-                    vRPclient.notify(source,lang.money.not_enough())
-				  end
-                end
-              end
-            end
-          end
-          
-          -- get player owned vehicles (indexed by vehicle type name in lower case)
-          local _pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-          local pvehicles = {}
-          for k,v in pairs(_pvehicles) do
-            pvehicles[string.lower(v.vehicle)] = true
-          end
-      
-          -- add rents to blacklist
-          for k,v in pairs(tmpdata.rent_vehicles) do
-            pvehicles[string.lower(k)] = true
-          end
-      
-          -- for each existing vehicle in the garage group
-          for k,v in pairs(vehicles) do
-            if k ~= "_config" and k ~= "_shop" and pvehicles[string.lower(k)] == nil then -- not already owned
-              local price = math.ceil(v[2]*cfg.rent_factor)
-			  if v[4] then
-                submenu[v[1]] = {choose,lang.garage.buy.item({vRP.getItemName(v[4]),price,v[3]})}
-			  else
-                submenu[v[1]] = {choose,lang.garage.buy.info({price,v[3]})}
-			  end
-              kitems[v[1]] = k
-            end
-          end
-      
-          vRP.openMenu(source,submenu)
-        end
-      end,lang.garage.rent.description()}
-      menu[lang.garage.store.title()] = {function(player,choice)
-        if Gclient.despawnGarageVehicle(source,veh_type,15) then
-		  vRPclient.notify(source,lang.garage.personal.stored())
-		else
-		  vRPclient.notify(source,lang.garage.personal.toofar())
-		end
-      end, lang.garage.store.description()}
-	elseif gtype == "shop" then
-      menu[lang.garage.shop.title()] = {function(player,choice)
-        local user_id = vRP.getUserId(source)
-		local tosub = false
-        if user_id then
-          -- build nested menu
-          local submenu = {name=lang.garage.title({lang.garage.shop.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-		  
-		  -- payment and saving
-          submenu.onclose = function()
-		    if not tosub then
-              vRP.openMenu(source,menu)
-		      Gclient.protectVehicle(source,false)
-			end
-          end
-		  
-          local ch_color = function(player, choice)
-			local old_vname, old_custom = Gclient.getVehicleMods(source, veh_type)
-            local subsubmenu = {name=lang.garage.title({lang.garage.shop.colour.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-            subsubmenu.onclose = function()
-			  tosub = false
-			  local vname, custom = Gclient.getVehicleMods(source, veh_type)
-			  local price = 0
-			  if custom then
-			    for k,v in pairs(custom.colour.custom.primary) do
-			      local old = old_custom.colour.custom.primary[k]
-			      if mod then
-			        if old ~= v then price = price + cfg.price.colour end -- modification
-			      end
-			    end
-			    for k,v in pairs(custom.colour.custom.secondary) do
-			      local old = old_custom.colour.custom.secondary[k]
-			      if mod then
-			        if old ~= v then price = price + cfg.price.colour end -- modification
-			      end
-			    end
-			    if custom.colour.primary ~= old_custom.colour.primary then price = price + cfg.price.colour end -- modification
-			    if custom.colour.secondary ~= old_custom.colour.secondary then price = price + cfg.price.colour end -- modification
-				local payment = false
-				if gpay == "bank" then
-                  payment = vRP.tryFullPayment(user_id,price)
-				elseif gpay == "wallet" then
-                  payment = vRP.tryPayment(user_id,price)
-				end
-				if payment then
-			      if vname then
-			        -- print("custom:u"..user_id.."veh_"..vname.." = " .. json.encode(custom)) -- uncomment to see data structure upon save
-			        vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode(custom))
-			        if price > 0 then
-                      vRPclient.notify(source,lang.money.paid({price}))
-			        end
-		          end
-				else
-				  Gclient.setVehicleMods(source,old_custom)
-                  vRPclient.notify(source,lang.money.not_enough())
-				end
-			  end
-              vRP.openMenu(source,submenu)
-            end
-            
-            local ch_pcolor = function(player, choice, mod)
-			  Gclient.scrollVehiclePrimaryColour(source,mod)
-            end
-            local ch_scolor = function(player, choice, mod)
-			  Gclient.scrollVehicleSecondaryColour(source,mod)
-            end
-            local ch_cpcolor = function(player, choice)
-			  local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
-			  rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
-			  local r,g,b = table.unpack(splitString(rgb, " "))
-			  Gclient.setCustomPrimaryColour(source,tonumber(r),tonumber(g),tonumber(b))
-            end
-            local ch_cscolor = function(player, choice)
-			  local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
-			  rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
-			  local r,g,b = table.unpack(splitString(rgb, " "))
-			  Gclient.setCustomSecondaryColour(source,tonumber(r),tonumber(g),tonumber(b))
-            end
-			
-            subsubmenu[lang.garage.shop.colour.primary()] = {ch_pcolor,""}
-            subsubmenu[lang.garage.shop.colour.secondary()] = {ch_scolor,""}
-            subsubmenu[lang.garage.shop.colour.custom.primary()] = {ch_cpcolor,""}
-            subsubmenu[lang.garage.shop.colour.custom.secondary()] = {ch_cscolor,""}
-			
-			tosub = true
-            vRP.openMenu(source,subsubmenu)
-          end
-          submenu[lang.garage.shop.colour.title()] = {ch_color,lang.garage.shop.colour.info({})}
-		  
-          local ch_extracolor = function(player, choice)
-			local old_vname, old_custom = Gclient.getVehicleMods(source, veh_type)
-            local subsubmenu = {name=lang.garage.title({lang.garage.shop.colour.extra.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-            subsubmenu.onclose = function()
-			  tosub = false
-			  local vname, custom = Gclient.getVehicleMods(source, veh_type)
-			  local price = 0
-			  if custom then
-			    for k,v in pairs(custom.colour.smoke) do
-			      local old = old_custom.colour.smoke[k]
-			      if mod then
-			        if old ~= v then price = price + cfg.price.extra end -- modification
-			      end
-			    end
-			    if custom.colour.pearlescent ~= old_custom.colour.pearlescent then price = price + cfg.price.extra end -- modification
-			    if custom.colour.wheel ~= old_custom.colour.wheel then price = price + cfg.price.extra end -- modification
-				local payment = false
-				if gpay == "bank" then
-                  payment = vRP.tryFullPayment(user_id,price)
-				elseif gpay == "wallet" then
-                  payment = vRP.tryPayment(user_id,price)
-				end
-				if payment then
-			      if vname then
-			        -- print("custom:u"..user_id.."veh_"..vname.." = " .. json.encode(custom)) -- uncomment to see data structure upon save
-			        vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode(custom))
-		          end
-			      if price > 0 then
-                    vRPclient.notify(source,lang.money.paid({price}))
-			      end
-				else
-				  Gclient.setVehicleMods(source,old_custom)
-                  vRPclient.notify(source,lang.money.not_enough())
-				end
-			  end
-              vRP.openMenu(source,submenu)
-            end
-            
-            local ch_pcolor = function(player, choice, mod)
-			  Gclient.scrollVehiclePearlescentColour(source,mod)
-            end
-            local ch_wcolor = function(player, choice, mod)
-			  Gclient.scrollVehicleWheelColour(source,mod)
-            end
-            local ch_scolor = function(player, choice)
-			  local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
-			  rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
-			  local r,g,b = table.unpack(splitString(rgb, " "))
-			  Gclient.setSmokeColour(source,tonumber(r),tonumber(g),tonumber(b))
-            end
-			
-            subsubmenu[lang.garage.shop.colour.extra.pearlescent()] = {ch_pcolor,""}
-            subsubmenu[lang.garage.shop.colour.extra.wheel()] = {ch_wcolor,""}
-            subsubmenu[lang.garage.shop.colour.extra.smoke()] = {ch_scolor,""}
-			
-			tosub = true
-            vRP.openMenu(source,subsubmenu)
-          end
-          submenu[lang.garage.shop.colour.extra.title()] = {ch_extracolor,lang.garage.shop.colour.extra.info({})}
-		  
-          local ch_neon = function(player, choice)
-			local old_vname, old_custom = Gclient.getVehicleMods(source, veh_type)
-            local subsubmenu = {name=lang.garage.title({lang.garage.shop.neon.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-            subsubmenu.onclose = function()
-			  tosub = false
-			  local vname, custom = Gclient.getVehicleMods(source, veh_type)
-			  local price = 0
-			  if custom then
-			    for k,v in pairs(custom.neon) do
-			      local old = old_custom.neon[k]
-			      if mod then
-			        if old ~= v then price = price + cfg.price.neon end -- modification
-			      end
-			    end
-			    for k,v in pairs(custom.colour.neon) do
-			      local old = old_custom.colour.neon[k]
-			      if mod then
-			        if old ~= v then price = price + cfg.price.neon end -- modification
-			      end
-			    end
-				local payment = false
-				if gpay == "bank" then
-                  payment = vRP.tryFullPayment(user_id,price)
-				elseif gpay == "wallet" then
-                  payment = vRP.tryPayment(user_id,price)
-				end
-				if payment then
-			      if vname then
-			        -- print("custom:u"..user_id.."veh_"..vname.." = " .. json.encode(custom)) -- uncomment to see data structure upon save
-			        vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode(custom))
-		          end
-			      if price > 0 then
-                    vRPclient.notify(source,lang.money.paid({price}))
-			      end
-				else
-				  Gclient.setVehicleMods(source,old_custom)
-                  vRPclient.notify(source,lang.money.not_enough())
-				end
-			  end
-              vRP.openMenu(source,submenu)
-            end
-            
-            local ch_nleft = function(player, choice)
-			  Gclient.toggleNeon(source,0)
-            end
-            local ch_nright = function(player, choice)
-			  Gclient.toggleNeon(source,1)
-            end
-            local ch_nfront = function(player, choice)
-			  Gclient.toggleNeon(source,2)
-            end
-            local ch_nback = function(player, choice)
-			  Gclient.toggleNeon(source,3)
-            end
-            local ch_ncolor = function(player, choice)
-			  local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
-			  rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
-			  local r,g,b = table.unpack(splitString(rgb, " "))
-			  Gclient.setNeonColour(source,tonumber(r),tonumber(g),tonumber(b))
-            end
-			
-            subsubmenu[lang.garage.shop.neon.back()] = {ch_nback,""}
-            subsubmenu[lang.garage.shop.neon.front()] = {ch_nfront,""}
-            subsubmenu[lang.garage.shop.neon.left()] = {ch_nleft,""}
-            subsubmenu[lang.garage.shop.neon.right()] = {ch_nright,""}
-            subsubmenu[lang.garage.shop.neon.colour()] = {ch_ncolor,""}
-		    
-			tosub = true
-            vRP.openMenu(source,subsubmenu)
-          end
-          submenu[lang.garage.shop.neon.title()] = {ch_neon,lang.garage.shop.neon.info({})}
-		  
-          local ch_mods = function(player, choice)
-            local kitems = {}
-			local old_vname, old_custom = Gclient.getVehicleMods(source, veh_type)
-            local subsubmenu = {name=lang.garage.title({lang.garage.shop.mods.title()}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-            subsubmenu.onclose = function()
-			  tosub = false
-			  local vname, custom = Gclient.getVehicleMods(source, veh_type)
-			  local price = 0
-			  local items = {}
-			  if custom then
-			    for k,v in pairs(custom.mods) do
-			      local old = old_custom.mods[k]
-			      local mod = mods[k]
-			      if mod then
-				    if old ~= v then
-				      if mod[4] then
-					    items[k] = {mod[4],mod[2]} -- item prices
-					  else price = price + mod[2] end -- modification
-					end
-			      end
-			    end
-				local payment = false
-				local payitems = false
-				if not next(items) then
-				  payitems = true
-				else
-				  for n,i in pairs(items) do
-                    payitems = vRP.tryGetInventoryItem(user_id,i[1],i[2],true)
-				    if not payitems then break end
-				  end
-				end
-				if payitems then
-				  if gpay == "bank" then
-                    payment = vRP.tryFullPayment(user_id,price)
-				  elseif gpay == "wallet" then
-                    payment = vRP.tryPayment(user_id,price)
-				  end
-				  if payment then
-			        if vname then
-			          -- print("custom:u"..user_id.."veh_"..vname.." = " .. json.encode(custom)) -- uncomment to see data structure upon save
-			          vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode(custom))
-			          if price > 0 then
-                        vRPclient.notify(source,lang.money.paid({price}))
-			          end
-		            end
-				  else
-				    Gclient.setVehicleMods(source,old_custom)
-                    vRPclient.notify(source,lang.money.not_enough())
-				  end
-				end
-			  end
-              vRP.openMenu(source,submenu)
-            end
-            
-            local ch_mod = function(player, choice, mod)
-		      Gclient.scrollVehicleMods(source,kitems[choice],mod)			
-            end
-            -- for each existing vehicle in the garage group
-            for k,v in pairs(mods) do
-              local price = math.max(v[2],0)
-			  if v[4] then
-                subsubmenu[v[1]] = {ch_mod,lang.garage.buy.item({vRP.getItemName(v[4]),price,v[3]})}
-			  else
-                subsubmenu[v[1]] = {ch_mod,lang.garage.buy.info({price,v[3]})}
-			  end
-              kitems[v[1]] = k
-            end
-			tosub = true
-            vRP.openMenu(source,subsubmenu)
-          end
-          submenu[lang.garage.shop.mods.title()] = {ch_mods,lang.garage.shop.mods.info({})}
-		  
-          local ch_repair = function(player, choice)
-		    local price = cfg.price.repair
-			local payment = false
-			if gpay == "bank" then
-              payment = vRP.tryFullPayment(user_id,price)
-			elseif gpay == "wallet" then
-              payment = vRP.tryPayment(user_id,price)
-			end
-			if payment then
-			  if price > 0 then
-                vRPclient.notify(source,lang.money.paid({price}))
-			  end
-			  Gclient.repairVehicle(source)
-			else
-              vRPclient.notify(source,lang.money.not_enough())
-			end
-          end
-          submenu[lang.garage.shop.repair.title()] = {ch_repair,lang.garage.shop.repair.info({})}
-		  
-          vRP.openMenu(source,submenu)
-		  Gclient.protectVehicle(source,true)
-        end
-      end,lang.garage.shop.description()}
+RegisterServerEvent("vrp_adv_garages_id2")
+AddEventHandler("vrp_adv_garages_id2",function(carname,enginehealth,bodyhealth,fuel)
+	local source = source
+	local user_id = vRP.getUserId(source)
+	if user_id then
+		vRP.execute("vRP/set_vehstatus",{ user_id = user_id, vehicle = carname, engine = parseInt(enginehealth), body = parseInt(bodyhealth), fuel = parseInt(fuel) })
 	end
-  end
-  
-  
-  vRP.openMenu(source,menu)
+end)
+
+function openGarage(source,gid,pos,head,payprice)
+	local source = source
+	local user_id = vRP.getUserId(source)
+	local vehicles = garage_types[gid]
+	local gtypes = vehicles._config.gtype
+	local mods = vehicles._shop
+	local menu = { name = gid }
+
+	for _,gtype in pairs(gtypes) do
+		if gtype == "personal" then
+			menu["Possuídos"] = { function(player,choice)
+				local user_id = vRP.getUserId(source)
+				if user_id then
+					local kitems = {}
+					local submenu = { name = "Possuídos" }
+					submenu.onclose = function()
+						vRP.openMenu(source,menu)
+					end
+
+					local choose = function(player,choice)
+						local vname = kitems[choice]
+						if vname then
+							local rows = vRP.query("vRP/get_detido",{ user_id = user_id, vehicle = vname })
+							--local data = vRP.getSData("custom:u"..user_id.."veh_"..vname)
+							--local custom = json.decode(data)
+							if not payprice then
+								vRP.closeMenu(source)
+								local cond,netid,carname = vRPgarage.spawnGarageVehicle(source,vname,pos,head,--[[custom,]]parseInt(rows[1].engine),parseInt(rows[1].body),parseInt(rows[1].fuel))
+								if cond then
+									idveh[netid] = { user_id,carname }
+								else
+									TriggerClientEvent("Notify",source,"aviso","Já tem um veículo deste modelo fora da garagem.")
+								end
+							else
+								if (vRP.getBankMoney(user_id)+vRP.getMoney(user_id)) >= parseInt(carros[vname].price*0.005) then
+									vRP.closeMenu(source)
+									local cond,netid,carname = vRPgarage.spawnGarageVehicle(source,vname,pos,head,--[[custom,]]parseInt(rows[1].engine),parseInt(rows[1].body),parseInt(rows[1].fuel))
+									if cond and vRP.tryFullPayment(user_id,parseInt(carros[vname].price*0.005)) then
+										idveh[netid] = { user_id,carname }
+									else
+										TriggerClientEvent("Notify",source,"aviso","Já tem um veículo deste modelo fora da garagem.")
+									end
+								else
+									TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+								end
+							end
+						end
+					end
+
+					local choosedetido = function(player,choice)
+						local vname = kitems[choice]
+						if vname then
+							local ok = vRP.request(source,"Veículo na detenção, deseja acionar o seguro pagando <b>$"..vRP.format(parseInt(carros[vname].price*0.1)).."</b> dólares?",60)
+							if ok then
+								if vRP.tryFullPayment(user_id,parseInt(carros[vname].price*0.1)) then
+									vRP.closeMenu(source)
+									vRP.execute("vRP/set_detido",{ user_id = user_id, vehicle = vname, detido = 0, time = 0 })
+									TriggerClientEvent("Notify",source,"sucesso","Veículo liberado.")
+								else
+									TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+								end
+							end
+						end
+					end
+
+					local choosedetidotime = function(source,choice)
+						local vname = kitems[choice]
+						if vname then
+							local ok = vRP.request(source,"Veículo na retenção, deseja acionar o seguro pagando <b>$"..vRP.format(parseInt(carros[vname].price*0.5)).."</b> dólares?",60)
+							if ok then
+								if vRP.tryFullPayment(user_id,parseInt(carros[vname].price*0.5)) then
+									vRP.closeMenu(source)
+									TriggerClientEvent("Notify",source,"sucesso","Seguradora foi acionada, aguarde a notificação da liberação.")
+									TriggerClientEvent("progress",source,30000,"liberando")
+									SetTimeout(30000,function()
+										vRP.execute("vRP/set_detido",{ user_id = user_id, vehicle = vname, detido = 0, time = 0 })
+										TriggerClientEvent("Notify",source,"sucesso","Veículo liberado.")
+									end)
+								else
+									TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+								end
+							end
+						end
+					end
+
+					local pvehicles = vRP.query("vRP/get_vehicles",{ user_id = user_id })
+					for k,v in pairs(pvehicles) do
+						local vehicle
+						for x,garage in pairs(garage_types) do
+							vehicle = garage[v.vehicle]
+							if vehicle then break end
+						end
+
+						if vehicle then
+							local rows = vRP.query("vRP/get_detido",{ user_id = user_id, vehicle = v.vehicle })
+							if parseInt(rows[1].detido) <= 0 then
+								submenu[vehicle[1]] = { choose,"<text01>Lataria:</text01> <text02>"..vRP.format(parseInt(rows[1].body*0.1)).."%</text02><text01>Motor:</text01> <text02>"..vRP.format(parseInt(rows[1].engine*0.1)).."%</text02><text01>Gasolina:</text01> <text02>"..vRP.format(parseInt(rows[1].fuel)).."%</text02><text01>Seguro:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.005)).."</text02><text01>Detenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.1)).."</text02><text01>Retenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.5)).."</text02>" }
+							else
+								if os.time() <= parseInt(rows[1].time+24*60*60) then
+									submenu[vehicle[1]] = { choosedetidotime,"<text01>Lataria:</text01> <text02>"..vRP.format(parseInt(rows[1].body*0.1)).."%</text02><text01>Motor:</text01> <text02>"..vRP.format(parseInt(rows[1].engine*0.1)).."%</text02><text01>Gasolina:</text01> <text02>"..vRP.format(parseInt(rows[1].fuel)).."%</text02><text01>Seguro:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.005)).."</text02><text01>Detenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.1)).."</text02><text01>Retenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.5)).."</text02>" }
+								else
+									submenu[vehicle[1]] = { choosedetido,"<text01>Lataria:</text01> <text02>"..vRP.format(parseInt(rows[1].body*0.1)).."%</text02><text01>Motor:</text01> <text02>"..vRP.format(parseInt(rows[1].engine*0.1)).."%</text02><text01>Gasolina:</text01> <text02>"..vRP.format(parseInt(rows[1].fuel)).."%</text02><text01>Seguro:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.005)).."</text02><text01>Detenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.1)).."</text02><text01>Retenção:</text01> <text02>$"..vRP.format(parseInt(carros[rows[1].vehicle].price*0.5)).."</text02>" }
+								end
+							end
+							kitems[vehicle[1]] = v.vehicle
+						end
+					end
+					vRP.openMenu(source,submenu)
+				end
+			end }
+
+			menu["Guardar"] = { function(player,choice)
+				local ok,name = vRPgarage.getNearestOwnedVehicle(source,30)
+				if ok then
+					vRPgarage.despawnGarageVehicle(source,name)
+				else
+					TriggerClientEvent('deletarveiculo',source,30)
+				end
+			end }
+		elseif gtype == "rent" then
+			menu["Aluguel"] = { function(player,choice)
+				local user_id = vRP.getUserId(source)
+				if user_id then
+					local kitems = {}
+					local submenu = { name = "Aluguel" }
+					submenu.onclose = function()
+						vRP.openMenu(source,menu)
+					end
+
+					local choose = function(player,choice)
+						local vname = kitems[choice]
+						if vname then
+							--local data = vRP.getSData("custom:u"..user_id.."veh_"..vname)
+							--local custom = json.decode(data) or false
+							local cond,netid,carname = vRPgarage.spawnGarageVehicle(source,vname,pos,head,--[[custom,]]1000,1000,100)
+							if cond then
+								idveh[netid] = { user_id,carname }
+							else
+								TriggerClientEvent("Notify",source,"aviso","Já tem um veículo deste modelo fora da garagem.")
+							end
+							vRP.closeMenu(source)
+						end
+					end
+
+					local _pvehicles = vRP.query("vRP/get_vehicles",{ user_id = user_id })
+					local pvehicles = {}
+					for k,v in pairs(_pvehicles) do
+						pvehicles[string.lower(v.vehicle)] = true
+					end
+
+					for k,v in pairs(vehicles) do
+						if k ~= "_config" and k ~= "_shop" and pvehicles[string.lower(k)] == nil then
+							submenu[v[1]] = { choose }
+							kitems[v[1]] = k
+						end
+					end
+					vRP.openMenu(source,submenu)
+				end
+			end }
+
+			menu["Guardar"] = { function(player,choice)
+				local ok,name = vRPgarage.getNearestOwnedVehicle(source,30)
+				if ok then
+					vRPgarage.despawnGarageVehicle(source,name)
+				else
+					TriggerClientEvent('deletarveiculo',source,30)
+				end
+			end }
+		elseif gtype == "store" then
+			menu["Comprar"] = { function(player,choice)
+				local user_id = vRP.getUserId(source)
+				if user_id then
+					local kitems = {}
+					local submenu = { name = "Comprar" }
+					submenu.onclose = function()
+						vRP.openMenu(source,menu)
+					end
+
+					local choose = function(player,choice)
+						local vname = kitems[choice]
+						if vname then
+							local vehicle = vehicles[vname]
+							if vehicle then
+								local rows = vRP.query("vRP/count_vehicle",{ vehicle = vname })
+								if vehicle[4] ~= -1 and parseInt(rows[1].qtd) >= vehicle[4] then
+									TriggerClientEvent("Notify",source,"importante","Estoque indisponivel.")
+								else
+									local totalv = vRP.query("vRP/get_maxcars",{ user_id = user_id })
+									if vRP.hasPermission(user_id,"bronze.permissao") then
+										if parseInt(totalv[1].quantidade) >= totalgaragem + 1 then
+											TriggerClientEvent("Notify",source,"importante","Atingiu o número máximo de veículos em sua garagem.")
+											return
+										end
+									elseif vRP.hasPermission(user_id,"prata.permissao") then
+										if parseInt(totalv[1].quantidade) >= totalgaragem + 3 then
+											TriggerClientEvent("Notify",source,"importante","Atingiu o número máximo de veículos em sua garagem.")
+											return
+										end
+									elseif vRP.hasPermission(user_id,"ouro.permissao") then
+										if parseInt(totalv[1].quantidade) >= totalgaragem + 5 then
+											TriggerClientEvent("Notify",source,"importante","Atingiu o número máximo de veículos em sua garagem.")
+											return
+										end
+									elseif vRP.hasPermission(user_id,"platina.permissao") then
+										if parseInt(totalv[1].quantidade) >= totalgaragem + 10 then
+											TriggerClientEvent("Notify",source,"importante","Atingiu o número máximo de veículos em sua garagem.")
+											return
+										end
+									else
+										if parseInt(totalv[1].quantidade) >= totalgaragem then
+											TriggerClientEvent("Notify",source,"importante","Atingiu o número máximo de veículos em sua garagem.")
+											return
+										end
+									end
+									local ok = vRP.request(source,"Tem certeza que deseja <b>comprar</b> este veículo?",30)
+									if ok then
+										if vRP.tryFullPayment(user_id,vehicle[2]) then
+											vRP.execute("vRP/add_vehicle",{ user_id = user_id, vehicle = vname })
+											if vehicle[2] > 0 then
+												TriggerClientEvent("Notify",source,"sucesso","Pagou <b>$"..vRP.format(parseInt(vehicle[2])).." dólares</b>.")
+											end
+											vRP.closeMenu(source)
+										else
+											TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+										end
+									end
+								end
+							end
+						end
+					end
+
+					local _pvehicles = vRP.query("vRP/get_vehicles",{ user_id = user_id })
+					local pvehicles = {}
+					for k,v in pairs(_pvehicles) do
+						pvehicles[string.lower(v.vehicle)] = true
+					end
+
+					for k,v in pairs(vehicles) do
+						if k ~= "_config" and k ~= "_shop" and pvehicles[string.lower(k)] == nil then
+							if v[2] > 0 then
+								submenu[v[1]] = { choose,"<text01>Valor:</text01> <text02>$"..v[2].."</text02><text01>P-Mala:</text01> <text02>"..v[3].."</text02>" }
+							else
+								submenu[v[1]] = { choose }
+							end
+							kitems[v[1]] = k
+						end
+					end
+					vRP.openMenu(source,submenu)
+				end
+			end }
+			menu["Vender"] = { function(player,choice)
+				local user_id = vRP.getUserId(source)
+				if user_id then
+					local kitems = {}
+					local submenu = { name = "Vender" }
+					submenu.onclose = function()
+						vRP.openMenu(source,menu)
+					end
+
+					local choose = function(player,choice)
+						local vname = kitems[choice]
+						if vname then
+							local vehicle = vehicles[vname]
+							if vehicle then
+								local price = math.ceil(vehicle[2]*0.7)
+								local rows = vRP.query("vRP/get_vehicle",{ user_id = user_id, vehicle = vname })
+								local drows = vRP.query("vRP/get_detido",{ user_id = user_id, vehicle = vname })
+								if parseInt(drows[1].detido) >= 1 then
+									TriggerClientEvent("Notify",source,"aviso","Acione a seguradora antes de vender.")
+									return
+								end
+								if #rows > 0 then
+									local ok = vRP.request(source,"Tem certeza que deseja <b>vender</b> este veículo?",30)
+									if ok then
+										vRP.execute("vRP/remove_vehicle",{ user_id = user_id, vehicle = vname })
+										--vRP.setSData("custom:u"..user_id.."veh_"..vname,json.encode())
+										vRP.giveMoney(user_id,parseInt(price))
+										if parseInt(price) > 0 then
+											TriggerClientEvent("Notify",source,"sucesso","Recebeu <b>$"..vRP.format(parseInt(price)).." dólares</b>.")
+										end
+										vRP.closeMenu(source)
+									end
+								else
+									TriggerClientEvent("Notify",source,"aviso","Não encontrado.")
+								end
+							end
+						end
+					end
+
+					local _pvehicles = vRP.query("vRP/get_vehicles",{ user_id = user_id })
+					local pvehicles = {}
+					for k,v in pairs(_pvehicles) do
+						pvehicles[string.lower(v.vehicle)] = true
+					end
+
+					for k,v in pairs(pvehicles) do
+						local vehicle = vehicles[k]
+						if vehicle then
+							if vehicle[2] > 0 then
+								submenu[vehicle[1]] = { choose,"<b>Valor:</b> $"..parseInt(math.ceil(vehicle[2]*0.7)) }
+							else
+								submenu[vehicle[1]] = { choose }
+							end
+							kitems[vehicle[1]] = k
+						end
+					end
+					vRP.openMenu(source,submenu)
+				end
+			end }
+		elseif gtype == "shop" then
+			menu["Loja"] = { function(player,choice)
+				local user_id = vRP.getUserId(source)
+				local tosub = false
+				if user_id then
+					local submenu = { name = "Loja" }
+					submenu.onclose = function()
+						if not tosub then
+							vRP.openMenu(source,menu)
+						end
+					end
+
+					local ch_color = function(player,choice)
+						local old_vname,old_custom = vRPgarage.getVehicleMods(source)
+						local subsubmenu = { name = "Cores" }
+						subsubmenu.onclose = function()
+							tosub = false
+							local vname,custom = vRPgarage.getVehicleMods(source)
+							if custom then
+								if vRP.tryFullPayment(user_id,3000) then
+									if vname then
+										local mPlaca = vRPclient.ModelName(player,7)
+										local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+										if mPlacaUser then
+											vRP.setSData("custom:u"..mPlacaUser.."veh_"..vname,json.encode(custom))
+										end
+										TriggerClientEvent("Notify",player,"sucesso","Pagou <b>$3.000 dólares</b>.")
+									end
+								else
+									vRPgarage.setVehicleMods(source,old_custom)
+									TriggerClientEvent("Notify",player,"negado","Dinheiro insuficiente.")
+								end
+							end
+						vRP.openMenu(source,submenu)
+					end
+
+					local ch_pri = function(player,choice,mod)
+						vRPgarage.scrollVehiclePrimaryColour(source,mod)
+					end
+
+					local ch_sec = function(player,choice,mod)
+						vRPgarage.scrollVehicleSecondaryColour(source,mod)
+					end
+
+					local ch_primaria = function(player,choice)
+						local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
+						rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
+						local r,g,b = table.unpack(splitString(rgb," "))
+						vRPgarage.setCustomPrimaryColour(source,tonumber(r),tonumber(g),tonumber(b))
+					end
+
+					local ch_secundaria = function(player,choice)
+						local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
+						rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
+						local r,g,b = table.unpack(splitString(rgb," "))
+						vRPgarage.setCustomSecondaryColour(source,tonumber(r),tonumber(g),tonumber(b))
+					end
+
+					local ch_perolada = function(player,choice,mod)
+						vRPgarage.scrollVehiclePearlescentColour(source,mod)
+					end
+
+					local ch_rodas = function(player,choice,mod)
+						vRPgarage.scrollVehicleWheelColour(source,mod)
+					end
+
+					local ch_fumaca = function(player,choice)
+						local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
+						rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
+						local r,g,b = table.unpack(splitString(rgb," "))
+						vRPgarage.setSmokeColour(source,tonumber(r),tonumber(g),tonumber(b))
+					end
+
+					subsubmenu["Primária"] = { ch_pri }
+					subsubmenu["Secundária"] = { ch_sec }
+					subsubmenu["Primária RGB"] = { ch_primaria }
+					subsubmenu["Secundária RGB"] = { ch_secundaria }
+					subsubmenu["Perolada"] = { ch_perolada }
+					subsubmenu["Rodas"] = { ch_rodas }
+					subsubmenu["Fumaça"] = { ch_fumaca }
+
+					tosub = true
+					vRP.openMenu(source,subsubmenu)
+				end
+
+				submenu["Cores"] = { ch_color,"<text01>Valor:</text01> <text02>$3.000</text02>" }
+
+				local ch_neon = function(player,choice)
+					local old_vname,old_custom = vRPgarage.getVehicleMods(source)
+					local subsubmenu = { name = "Neon" }
+					subsubmenu.onclose = function()
+						tosub = false
+						local vname,custom = vRPgarage.getVehicleMods(source)
+						if custom then
+							if vRP.tryFullPayment(user_id,3000) then
+								if vname then
+									local mPlaca = vRPclient.ModelName(player,7)
+									local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+									if mPlacaUser then
+										vRP.setSData("custom:u"..mPlacaUser.."veh_"..vname,json.encode(custom))
+									end
+									TriggerClientEvent("Notify",player,"sucesso","Pagou <b>$3.000 dólares</b>.")
+								end
+							else
+								vRPgarage.setVehicleMods(source,old_custom)
+								TriggerClientEvent("Notify",player,"negado","Dinheiro insuficiente.")
+							end
+						end
+						vRP.openMenu(source,submenu)
+					end
+
+					local ch_nleft = function(player,choice)
+						vRPgarage.toggleNeon(source,0)
+					end
+
+					local ch_nright = function(player,choice)
+						vRPgarage.toggleNeon(source,1)
+					end
+
+					local ch_nfront = function(player,choice)
+						vRPgarage.toggleNeon(source,2)
+					end
+
+					local ch_nback = function(player,choice)
+						vRPgarage.toggleNeon(source,3)
+					end
+
+					local ch_ncolor = function(player,choice)
+						local rgb = vRP.prompt(source,"RGB Color(255 255 255):","")
+						rgb = sanitizeString(rgb,"\"[]{}+=?!_()#@%/\\|,.",false)
+						local r,g,b = table.unpack(splitString(rgb," "))
+						vRPgarage.setNeonColour(source,tonumber(r),tonumber(g),tonumber(b))
+					end
+
+					subsubmenu["Traseiro"] = { ch_nback }
+					subsubmenu["Dianteiro"] = { ch_nfront }
+					subsubmenu["Esquerdo"] = { ch_nleft }
+					subsubmenu["Direito"] = { ch_nright }
+					subsubmenu["Cor"] = { ch_ncolor }
+					tosub = true
+					vRP.openMenu(source,subsubmenu)
+				end
+
+				submenu["Neon"] = { ch_neon,"<text01>Valor:</text01> <text02>$3.000</text02>" }
+
+				local ch_mods = function(player,choice)
+					local kitems = {}
+					local old_vname,old_custom = vRPgarage.getVehicleMods(source)
+					local subsubmenu = { name = "Modificações" }
+					subsubmenu.onclose = function()
+						tosub = false
+						local vname,custom = vRPgarage.getVehicleMods(source)
+						local price = 0
+						local items = {}
+						if custom then
+							for k,v in pairs(custom.mods) do
+								local old = old_custom.mods[k]
+								local mod = mods[k]
+								if mod then
+									if old ~= v then
+										if mod[4] then
+											items[k] = { mod[4],mod[2] }
+										else
+											price = price + mod[2]
+										end
+									end
+								end
+							end
+							if vRP.tryFullPayment(user_id,price) then
+								if vname then
+									local mPlaca = vRPclient.ModelName(player,7)
+									local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+									if mPlacaUser then
+										vRP.setSData("custom:u"..mPlacaUser.."veh_"..vname,json.encode(custom))
+									end
+									if price > 0 then
+										TriggerClientEvent("Notify",source,"sucesso","Pagou <b>$"..vRP.format(parseInt(price)).." dólares</b>.")
+									end
+								end
+							else
+								vRPgarage.setVehicleMods(source,old_custom)
+								TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+							end
+						end
+						vRP.openMenu(source,submenu)
+					end
+
+					local ch_mod = function(player,choice,mod)
+						vRPgarage.scrollVehicleMods(source,kitems[choice],mod)
+					end
+
+					for k,v in pairs(mods) do
+						if v[2] > 0 then
+							subsubmenu[v[1]] = { ch_mod,"<text01>Valor:</text01> <text02>$"..parseInt(math.max(v[2],0)).."</text02>" }
+						else
+							subsubmenu[v[1]] = { ch_mod }
+						end
+						kitems[v[1]] = k
+					end
+					tosub = true
+					vRP.openMenu(source,subsubmenu)
+				end
+
+				submenu["Modificações"] = { ch_mods }
+				vRP.openMenu(source,submenu)
+				end
+			end }
+		end
+	end
+	vRP.openMenu(source,menu)
 end
 
-local function build_client_garages(source)
-  local user_id = vRP.getUserId(source)
-  local address = vRP.getUserAddress(user_id)
-  if user_id then
-    for k,v in pairs(cfg.garages) do
-      local gid,x,y,z = table.unpack(v)
-	  local vehicles = cfg.adv_garages[gid]
+local function build_garages(source)
+	local source = source
+	local user_id = vRP.getUserId(source)
+	local address = vRP.getUserAddress(user_id)
+	if user_id then
+		if #address > 0 then
+			for k,v in pairs(cfg.garages) do
+				local i,x,y,z,x2,y2,z2,h,opac,pay = table.unpack(v)
+				local g = cfg.garage_types[i]
 
-      if vehicles then
-        local gcfg = vehicles._config
-		
-		if not address then address = {} end
-		if not gcfg.ghome or gcfg.ghome == address.home then
-          -- enter
-          local garage_enter = function(player,area)
-            local user_id = vRP.getUserId(source)
-            if user_id and vRP.hasPermissions(user_id,gcfg.permissions or {}) then
-              vRPg.openGarage(source,gid,{x,y,z})
-            end
-          end
-          
-          -- leave
-          local garage_leave = function(player,area)
-            vRP.closeMenu(source)
-            vRP.closeMenu(source)
-            vRP.closeMenu(source)
-            vRP.closeMenu(source)
-            vRP.closeMenu(source)
-          end
-          
-		  if gcfg.blipid then
-            vRPclient.addBlip(source,x,y,z,gcfg.blipid,gcfg.blipcolor,lang.garage.title({gid}))
-		  end
-          vRPclient.addMarker(source,x,y,z-1,1.5,1.5,0.7,0,125,255,125,150)
-          
-          vRP.setArea(source,"vRP:garage"..k,x,y,z,2,2,garage_enter,garage_leave)
+				if g then
+					for kk,vv in pairs(address) do
+						local cfg = g._config
+						if not cfg.ghome or cfg.ghome == vv.home then
+							local garage_enter = function(player,area)
+								if user_id and vRP.hasPermissions(user_id,cfg.permissions or {}) then
+									openGarage(source,i,{x2,y2,z2},h,pay)
+								end
+							end
+
+							local garage_leave = function(player,area)
+								vRP.closeMenu(source)
+							end
+
+							vRPclient._addMarker(source,23,x,y,z-0.95,2,2,0.5,0,95,140,opac,100)
+							vRP.setArea(source,"vRP:garage"..k,x,y,z,1.0,1.0,garage_enter,garage_leave)
+						end
+					end
+				end
+			end
+		else
+			for k,v in pairs(cfg.garages) do
+				local i,x,y,z,x2,y2,z2,h,opac,pay = table.unpack(v)
+				local g = cfg.garage_types[i]
+
+				if g then
+					local cfg = g._config
+						if not cfg.ghome then
+							local garage_enter = function(player,area)
+							if user_id and vRP.hasPermissions(user_id,cfg.permissions or {}) then
+								openGarage(source,i,{x2,y2,z2},h,pay)
+							end
+						end
+
+						local garage_leave = function(player,area)
+							vRP.closeMenu(source)
+						end
+
+						vRPclient._addMarker(source,23,x,y,z-0.95,2,2,0.5,0,95,140,opac,100)
+						vRP.setArea(source,"vRP:garage"..k,x,y,z,1.0,1.0,garage_enter,garage_leave)
+					end
+				end
+			end
 		end
-      end
-    end
-  end
+	end
 end
 
 AddEventHandler("vRP:playerSpawn",function(user_id,source,first_spawn)
-  if first_spawn then
-    build_client_garages(source)
-  end
+	if first_spawn then
+		build_garages(source)
+	end
+end)
+-----------------------------------------------------------------------------------------------------------------------------------------
+-- VENDER O VEÍCULO PARA OUTRO JOGADOR
+-----------------------------------------------------------------------------------------------------------------------------------------
+RegisterCommand('vehs',function(source,args,rawCommand)
+	local user_id = vRP.getUserId(source)
+	if user_id then
+		local menu = vRP.buildMenu("vehicle",{ user_id = user_id, player = source, vname = name })
+		menu.name = "Veículos"
+
+		local kitems = {}
+		local choose = function(source,choice)
+			local tosub = false
+			local vehicle = choice
+			local vname = kitems[vehicle]
+			local submenu = { name = vehicle }
+			submenu.onclose = function()
+				tosub = false
+				vRP.openMenu(source,menu)
+			end
+
+			local ch_sell = function(source,choice)
+				local nplayer = vRPclient.getNearestPlayer(source,3)
+				if nplayer then
+					local tuser_id = vRP.getUserId(nplayer)
+					local totalv = vRP.query("vRP/get_maxcars",{ user_id = tuser_id })
+					if vRP.hasPermission(tuser_id,"bronze.permissao") then
+						if parseInt(totalv[1].quantidade) >= totalgaragem + 1 then
+							TriggerClientEvent("Notify",source,"importante","A pessoa atingiu o número máximo de veículos na garagem.")
+							return
+						end
+					elseif vRP.hasPermission(tuser_id,"prata.permissao") then
+						if parseInt(totalv[1].quantidade) >= totalgaragem + 3 then
+							TriggerClientEvent("Notify",source,"importante","A pessoa atingiu o número máximo de veículos na garagem.")
+							return
+						end
+					elseif vRP.hasPermission(tuser_id,"ouro.permissao") then
+						if parseInt(totalv[1].quantidade) >= totalgaragem + 5 then
+							TriggerClientEvent("Notify",source,"importante","A pessoa atingiu o número máximo de veículos na garagem.")
+							return
+						end
+					elseif vRP.hasPermission(tuser_id,"platina.permissao") then
+						if parseInt(totalv[1].quantidade) >= totalgaragem + 10 then
+							TriggerClientEvent("Notify",source,"importante","A pessoa atingiu o número máximo de veículos na garagem.")
+							return
+						end
+					else
+						if parseInt(totalv[1].quantidade) >= totalgaragem then
+							TriggerClientEvent("Notify",source,"importante","A pessoa atingiu o número máximo de veículos na garagem.")
+							return
+						end
+					end
+					local owned = vRP.query("vRP/get_vehicle",{ user_id = tuser_id, vehicle = vname })
+					if #owned == 0 then
+						local price = tonumber(sanitizeString(vRP.prompt(source,"Valor:",""),"\"[]{}+=?!_()#@%/\\|,.",false))
+						local ok = vRP.request(nplayer,"Aceita comprar um <b>"..vehicle.."</b> por <b>$"..vRP.format(parseInt(price)).."</b> dólares?",30)
+						if ok then
+							if parseInt(price) > 0 then
+								if vRP.tryFullPayment(tuser_id,parseInt(price)) then
+									vRP.execute("vRP/move_vehicle",{ user_id = user_id, tuser_id = tuser_id, vehicle = vname })
+									--local data = vRP.getSData("custom:u"..user_id.."veh_"..vname)
+									--local custom = json.decode(data)
+									--vRP.setSData("custom:u"..tuser_id.."veh_"..vname, json.encode(custom))
+									--vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode())
+									vRP.giveMoney(user_id,parseInt(price))
+									TriggerClientEvent("Notify",nplayer,"sucesso","Pagou <b>$"..vRP.format(parseInt(price)).." dólares</b>.")
+									TriggerClientEvent("Notify",source,"sucesso","Recebeu <b>$"..vRP.format(parseInt(price)).." dólares</b>.")
+								else
+									TriggerClientEvent("Notify",nplayer,"negado","Dinheiro insuficiente.")
+									TriggerClientEvent("Notify",source,"negado","Dinheiro insuficiente.")
+								end
+							end
+						end
+					else
+						TriggerClientEvent("Notify",nplayer,"importante","Veículo ja possuído.")
+						TriggerClientEvent("Notify",source,"importante","Veículo ja possuído.")
+					end
+				end
+			end
+			submenu["Vender"] = { ch_sell }
+			tosub = true
+			vRP.openMenu(source,submenu)
+		end
+
+		local choosedetido = function(source,choice)
+			TriggerClientEvent("Notify",source,"importante","Veículo roubado ou detido pela policia, acione a seguradora.")
+		end
+
+		local pvehicles = vRP.query("vRP/get_vehicles",{ user_id = user_id })
+		for k,v in pairs(pvehicles) do
+			local vehicle
+			for x,garage in pairs(garage_types) do
+				vehicle = garage[v.vehicle]
+				if vehicle then break end
+			end
+
+			if vehicle then
+				local rows = vRP.query("vRP/get_detido",{ user_id = user_id, vehicle = v.vehicle })
+				if parseInt(rows[1].detido) <= 0 then
+					menu[vehicle[1]] = { choose }
+				else
+					menu[vehicle[1]] = { choosedetido }
+				end
+				kitems[vehicle[1]] = v.vehicle
+			end
+		end
+
+		vRP.openMenu(source,menu)
+	end
+end)
+-----------------------------------------------------------------------------------------------------------------------------------------
+-- BOTÃO L PARA TRANCAR
+-----------------------------------------------------------------------------------------------------------------------------------------
+RegisterServerEvent("buttonLock")
+AddEventHandler("buttonLock",function()
+	local source = source
+	local user_id = vRP.getUserId(source)
+	local mPlaca = vRPclient.ModelName(source,7)
+	local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+	if user_id == mPlacaUser then
+		vRPgarage.toggleLock(source)
+		TriggerClientEvent("vrp_sound:source",source,'lock',0.1)
+	end
 end)
 
--- VEHICLE MENU
+RegisterServerEvent("tryLock")
+AddEventHandler("tryLock",function(nveh)
+	TriggerClientEvent("syncLock",-1,nveh)
+end)
+-----------------------------------------------------------------------------------------------------------------------------------------
+-- BOTÃO PAGEUP PARA ABRIR PORTA-MALAS
+-----------------------------------------------------------------------------------------------------------------------------------------
+RegisterServerEvent("buttonTrunk")
+AddEventHandler("buttonTrunk",function()
+	local source = source
+	local user_id = vRP.getUserId(source)
+	local mPlaca,mName,mNet,mPrice,mBanido,mLock = vRPclient.ModelName(source,7)
+	if not mLock then
+		if mPlaca then
+			if mName then
+				if mBanido then
+					TriggerClientEvent("Notify",source,"negado","Veículos de serviço ou alugados não podem utilizar o Porta-Malas.")
+					return
+				end
+				local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+				if mPlacaUser then
+					local chestname = "u"..mPlacaUser.."veh_"..string.lower(mName)
+					local max_weight = cfg_inventory.vehicle_chest_weights[string.lower(mName)] or 50
 
--- define vehicle actions
--- action => {cb(user_id,player,veh_group,veh_name),desc}
-local veh_actions = {}
+					local cb_out = function(idname,amount)
+						if parseInt(amount) > 0 then
+							TriggerClientEvent("Notify",source,"sucesso","Retirado <b>"..amount.."x "..vRP.getItemName(idname).."</b>.")
+						end
+					end
 
--- open trunk
-veh_actions[lang.vehicle.trunk.title()] = {function(user_id,player,vtype,name)
-  local chestname = "u"..user_id.."veh_"..string.lower(name)
-  local max_weight = cfg_inventory.vehicle_chest_weights[string.lower(name)] or cfg_inventory.default_vehicle_chest_weight
+					local cb_in = function(idname,amount)
+						if parseInt(amount) > 0 then
+							TriggerClientEvent("Notify",source,"sucesso","Colocado <b>"..amount.."x "..vRP.getItemName(idname).."</b>.")
+						end
+					end
 
-  -- open chest
-  Gclient.vc_openDoor(player, vtype,5)
-  vRP.openChest(player, chestname, max_weight, function()
-    Gclient.vc_closeDoor(player, vtype,5)
-  end)
-end, lang.vehicle.trunk.description()}
-
--- detach trailer
-veh_actions[lang.vehicle.detach_trailer.title()] = {function(user_id,player,vtype,name)
-  Gclient.vc_detachTrailer(player, vtype)
-end, lang.vehicle.detach_trailer.description()}
-
--- detach towtruck
-veh_actions[lang.vehicle.detach_towtruck.title()] = {function(user_id,player,vtype,name)
-  Gclient.vc_detachTowTruck(player, vtype)
-end, lang.vehicle.detach_towtruck.description()}
-
--- detach cargobob
-veh_actions[lang.vehicle.detach_cargobob.title()] = {function(user_id,player,vtype,name)
-  Gclient.vc_detachCargobob(player, vtype)
-end, lang.vehicle.detach_cargobob.description()}
-
--- lock/unlock
-veh_actions[lang.vehicle.lock.title()] = {function(user_id,player,vtype,name)
-  Gclient.vc_toggleLock(player, vtype)
-end, lang.vehicle.lock.description()}
-
--- engine on/off
-veh_actions[lang.vehicle.engine.title()] = {function(user_id,player,vtype,name)
-  Gclient.vc_toggleEngine(player, vtype)
-end, lang.vehicle.engine.description()}
-
-local function ch_vehicle(player,choice)
-  local user_id = vRP.getUserId(player)
-  if user_id then
-    -- build vehicle menu
-    -- check vehicle
-    local ok,vtype,name = Gclient.getNearestOwnedVehicle(player,7)
-    local menu = vRP.buildMenu("vehicle", {user_id = user_id, player = player, vtype = vtype, vname = name})
-    menu.name=lang.vehicle.title()
-    menu.css={top="75px",header_color="rgba(255,125,0,0.75)"}
-
-    if ok then
-      for k,v in pairs(veh_actions) do
-        menu[k] = {function(player,choice) v[1](user_id,player,vtype,name) end, v[2]}
-      end
-	end
-	
-    local ch_keys = function(player,choice)
-      local user_id = vRP.getUserId(player)
-      if user_id then
-    	local kitems = {}
-		local tosub = false
-        local submenu = {name=lang.garage.keys.title(), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-        submenu.onclose = function()
-    	  if not tosub then
-            vRP.openMenu(player,menu)
-    	  end
-    	end
-    		  
-    	local choose = function(player, choice)
-    	  local vehicle = choice
-    	  local vname = kitems[vehicle]
-          local subsubmenu = {name=lang.garage.keys.key({vehicle}), css={top="75px",header_color="rgba(255,125,0,0.75)"}}
-    	  subsubmenu.onclose = function()
-    		tosub = false
-			vRP.openMenu(player,submenu)
-    	  end
-          
-          local ch_sell = function(player, choice)
-    		local nplayer = vRPclient.getNearestPlayer(player, 5)
-    		if nplayer then
-    		  local tuser_id = vRP.getUserId(nplayer)
-			  local owned = vRP.query("vRP/get_vehicle", {user_id = tuser_id, vehicle = vname})
-			  if #owned == 0 then
-    	        local price = tonumber(sanitizeString(vRP.prompt(player,lang.garage.keys.sell.prompt(),""),"\"[]{}+=?!_()#@%/\\|,.",false))
-    		    local ok = vRP.request(nplayer, lang.garage.keys.sell.request({vehicle,price}), 30)
-    		    if ok then
-    		      if vRP.tryFullPayment(tuser_id,price) then
-    			    vRP.execute("vRP/move_vehicle", {user_id = user_id, tuser_id = tuser_id, vehicle = vname})
-    			    local data = vRP.getSData("custom:u"..user_id.."veh_"..vname)
-    			    local custom = json.decode(data)
-    			    vRP.setSData("custom:u"..tuser_id.."veh_"..vname, json.encode(custom))
-    			    vRP.setSData("custom:u"..user_id.."veh_"..vname, json.encode())
-    			    if price > 0 then
-					  vRP.giveBankMoney(user_id,price)
-                      vRPclient.notify(nplayer,lang.money.paid({price}))
-                      vRPclient.notify(player,lang.money.received({price}))
-    			    end
-				    local vtype, vehicle = Gclient.isOwnedVehicleOut(player, vname)
-				    if vtype and vehicle then
-				  	if Gclient.despawnGarageVehicle(player,vtype,999999) then
-				        if not Gclient.spawnGarageVehicle(nplayer,vtype,vname,pos) then
-				    	    vRPclient.notify(nplayer,lang.garage.personal.out())
-				        end
-				  	end
-				    else
-				    	vRPclient.notify(nplayer,lang.garage.personal.bought())
-				    end
-				    vRPclient.notify(player,lang.garage.personal.sold())
-    			  else
-                    vRPclient.notify(player,lang.money.not_enough())
-                    vRPclient.notify(nplayer,lang.money.not_enough())
-    			  end
-    		    else
-    		      vRPclient.notify(player,lang.common.request_refused())
-    		    end
-    		  else
-                vRPclient.notify(nplayer,lang.garage.keys.sell.owned())
-                vRPclient.notify(player,lang.garage.keys.sell.owned())
-    		  end
-			else
-    		  vRPclient.notify(player,lang.common.no_player_near())
+					vRPgarage.toggleTrunk(source)
+					vRP.openChest(source,chestname,max_weight,function()
+						vRPgarage.toggleTrunk(source)
+					end,cb_in,cb_out)
+				end
 			end
-          end
-    	  
-          subsubmenu[lang.garage.keys.sell.title()] = {ch_sell,lang.garage.keys.sell.description()}
-    	  
-    	  tosub = true
-          vRP.openMenu(player,subsubmenu)
-        end
-         -- get player owned vehicles (indexed by vehicle type name in lower case)
-        local pvehicles = vRP.query("vRP/get_vehicles", {user_id = user_id})
-    	for k,v in pairs(pvehicles) do
-		  local vehicle
-		  for x,garage in pairs(adv_garages) do
-            vehicle = garage[v.vehicle]
-		    if vehicle then break end
-		  end
-		
-		  if vehicle then
-            submenu[vehicle[1]] = {choose,vehicle[3]}
-            kitems[vehicle[1]] = v.vehicle
-          end
-        end
-    
-        vRP.openMenu(player,submenu)
-      end
-    end
-	
-    menu[lang.garage.keys.title()] = {ch_keys, lang.garage.keys.description()}
-
-    vRP.openMenu(player,menu)
-  end
-end
-
--- ask trunk (open other user car chest)
-local function ch_asktrunk(player,choice)
-  local nplayer = vRPclient.getNearestPlayer(player,10)
-  local nuser_id = vRP.getUserId(nplayer)
-  if nuser_id then
-    vRPclient.notify(player,lang.vehicle.asktrunk.asked())
-    if vRP.request(nplayer,lang.vehicle.asktrunk.request(),15) then -- request accepted, open trunk
-      local ok,vtype,name = Gclient.getNearestOwnedVehicle(nplayer,7)
-      if ok then
-        local chestname = "u"..nuser_id.."veh_"..string.lower(name)
-        local max_weight = cfg_inventory.vehicle_chest_weights[string.lower(name)] or cfg_inventory.default_vehicle_chest_weight
-
-        -- open chest
-        local cb_out = function(idname,amount)
-          vRPclient.notify(nplayer,lang.inventory.give.given({vRP.getItemName(idname),amount}))
-        end
-
-        local cb_in = function(idname,amount)
-          vRPclient.notify(nplayer,lang.inventory.give.received({vRP.getItemName(idname),amount}))
-        end
-
-        Gclient.vc_openDoor(nplayer, vtype,5)
-        vRP.openChest(player, chestname, max_weight, function()
-          Gclient.vc_closeDoor(nplayer, vtype,5)
-        end,cb_in,cb_out)
-      else
-        vRPclient.notify(player,lang.vehicle.no_owned_near())
-        vRPclient.notify(nplayer,lang.vehicle.no_owned_near())
-      end
-    else
-      vRPclient.notify(player,lang.common.request_refused())
-    end
-  else
-    vRPclient.notify(player,lang.common.no_player_near())
-  end
-end
-
-Citizen.CreateThread(function()
-  vRP.registerMenuBuilder("main", function(add, data)
-    Citizen.CreateThread(function()
-      local user_id = vRP.getUserId(data.player)
-      if user_id then
-        -- add vehicle entry
-        local choices = {}
-        choices[lang.vehicle.title()] = {ch_vehicle}
-      
-        -- add ask trunk
-        choices[lang.vehicle.asktrunk.title()] = {ch_asktrunk}
-      
-        add(choices)
-      end
-	end)
-  end)
+		end
+	end
+end)
+-----------------------------------------------------------------------------------------------------------------------------------------
+-- ANCORAR
+-----------------------------------------------------------------------------------------------------------------------------------------
+RegisterCommand('ancorar',function(source,args,rawCommand)
+	local source = source
+	local user_id = vRP.getUserId(source)
+	local mPlaca = vRPclient.ModelName(source,7)
+	local mPlacaUser = vRP.getUserByRegistration(mPlaca)
+	if user_id == mPlacaUser then
+		vRPgarage.toggleAnchor(source)
+	end
 end)

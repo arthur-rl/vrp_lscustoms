@@ -1,566 +1,659 @@
---[[
-    FiveM Scripts
-    Copyright C 2018  Sighmir
-
-    This program is free software: you can redistribute it and/or modify
-    it under the terms of the GNU Affero General Public License as published
-    by the Free Software Foundation, either version 3 of the License, or
-    at your option any later version.
-
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU Affero General Public License for more details.
-
-    You should have received a copy of the GNU Affero General Public License
-    along with this program.  If not, see <http://www.gnu.org/licenses/>.
-]]
-
-
 local cfg = {}
--- define garage types with their associated vehicles
--- (vehicle list: https://wiki.fivem.net/wiki/Vehicles)
 
--- each garage type is an associated list of veh_name/veh_definition 
--- they need a _config property to define the blip and the vehicle type for the garage (each vtype allow one vehicle to be spawned at a time, the default vtype is "default")
--- this is used to let the player spawn a boat AND a car at the same time for example, and only despawn it in the correct garage
--- _config: gtype, vtype, blipid, blipcolor, ghome, permissions (optional, only users with the permission will have access to the shop)
--- vtype: identifies the "type" of vehicle for the personal garages and vehicles (you can create new ones)
--- gtype: there are 5 gtypes> personal, showroom, shop, store and rental (you cant create new ones, one garage can have many gtypes)
-   -- personal: allow you to get any personal vehicle of the same vtype of the garage
-   -- showroom: allows you to see the vehicle model before purchasing it
-   -- shop: allows you to modify your vehicle
-   -- store: allows you to purchase and sell vehicles
-   -- rental: allows you to rent vehicles for that session for a part of the price
--- ghome: links the garage with an address, only owners of that address will have see the garage
--- gpay: bank or wallet
--- Car/Mod: [id/model] = {"Display Name", price/amount, "", (optional) item}, -- when charging items, price becomes amount
-
-cfg.lang = "en" -- lenguage file
-
-cfg.rent_factor = 0.1 -- 10% of the original price if a rent
-cfg.sell_factor = 0.75 -- sell for 75% of the original price
-
-cfg.price = {
-  repair = 500, -- value to repair the vehicle
-  colour = 100, -- value will be charged 3 times for RGB
-  extra = 100, -- value will be charged 3 times for RGB
-  neon = 100 -- value will be charged 3 times for RGB
-}
-
--- declare any item used on purchase that doesnt exist yet (name,description,choices,weight}
-cfg.items = {
-  ["issi2key"] = {"Issi 2 Key","Buys an Issi",nil,0.5} -- example
-}
-
--- configure garage types
-cfg.adv_garages = {
-  ["Compacts"]  = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["blista"] = {"Blista", 15000, ""},
-    ["brioso"] = {"Brioso R/A", 155000, ""},
-    ["dilettante"] = {"Dilettante", 25000, ""},
-    ["issi2"] = {"Issi", 1, "", "issi2key"}, -- vehicle sold by item as example
-    ["panto"] = {"Panto", 85000, ""},
-    ["prairie"] = {"Prairie", 30000, ""},
-    ["rhapsody"] = {"Rhapsody", 120000, ""}
-  },
-
-  ["Coupe"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["cogcabrio"] = {"Cognoscenti Cabrio",180000, ""},
-    ["exemplar"] = {"Exemplar", 200000, ""},
-    ["f620"] = {"F620", 80000, ""},
-    ["felon"] = {"Felon", 90000, ""},
-    ["felon2"] = {"Felon GT", 95000, ""},
-    ["jackal"] = {"Jackal", 60000, ""},
-    ["oracle"] = {"Oracle", 80000, ""},
-    ["oracle2"] = {"Oracle XS",82000, ""},
-    ["sentinel"] = {"sentinel", 90000, ""},
-    ["sentinel2"] = {"Sentinel XS", 60000, ""},
-    ["windsor"] = {"Windsor",800000, ""},
-    ["windsor2"] = {"Windsor Drop",850000, ""},
-    ["zion"] = {"Zion", 60000, ""},
-    ["zion2"] = {"Zion Cabrio", 65000, ""}
-  },
-
-  ["Sports"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["ninef"] = {"9F",120000, ""},
-    ["ninef2"] = {"9F Cabrio",130000, ""},
-    ["alpha"] = {"Alpha",150000, ""},
-    ["banshee"] = {"Banshee",105000, ""},
-    ["bestiagts"] = {"Bestia GTS",610000, ""},
-    ["blista"] = {"Blista Compact",42000, ""},
-    ["buffalo"] = {"Buffalo",35000, ""},
-    ["buffalo2"] = {"Buffalo S",96000, ""},
-    ["carbonizzare"] = {"Carbonizzare",195000, ""},
-    ["comet2"] = {"Comet",100000, ""},
-    ["coquette"] = {"Coquette",138000, ""},
-    ["tampa2"] = {"Drift Tampa",995000, ""},
-    ["feltzer2"] = {"Feltzer",130000, ""},
-    ["furoregt"] = {"Furore GT",448000, ""},
-    ["fusilade"] = {"Fusilade",36000, ""},
-    ["jester"] = {"Jester",240000, ""},
-    ["jester2"] = {"Jester (Racecar)",350000, ""},
-    ["kuruma"] = {"Kuruma",95000, ""},
-    ["lynx"] = {"Lynx",1735000, ""},
-    ["massacro"] = {"Massacro",275000, ""},
-    ["massacro2"] = {"Massacro (Racecar)",385000, ""},
-    ["omnis"] = {"Omnis",701000, ""},
-    ["penumbra"] = {"Penumbra",24000, ""},
-    ["rapidgt"] = {"Rapid GT",140000, ""},
-    ["rapidgt2"] = {"Rapid GT Convertible",150000, ""},
-    ["schafter3"] = {"Schafter V12",140000, ""},
-    ["sultan"] = {"Sultan",12000, ""},
-    ["surano"] = {"Surano",110000, ""},
-    ["tropos"] = {"Tropos",816000, ""},
-    ["verlierer2"] = {"Verkierer",695000,""}
-  },
-
-  ["Classics"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=5},
-    ["casco"] = {"Casco",680000, ""},
-    ["coquette2"] = {"Coquette Classic",665000, ""},
-    ["jb700"] = {"JB 700",350000, ""},
-    ["pigalle"] = {"Pigalle",400000, ""},
-    ["stinger"] = {"Stinger",850000, ""},
-    ["stingergt"] = {"Stinger GT",875000, ""},
-    ["feltzer3"] = {"Stirling",975000, ""},
-    ["ztype"] = {"Z-Type",950000,""}
-  },
-
-  ["Super Cars"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=5},
-    ["adder"] = {"Adder",1000000, ""},
-    ["banshee2"] = {"Banshee 900R",565000, ""},
-    ["bullet"] = {"Bullet",155000, ""},
-    ["cheetah"] = {"Cheetah",650000, ""},
-    ["entityxf"] = {"Entity XF",795000, ""},
-    ["sheava"] = {"ETR1",199500, "4 - (smaller number better car"},
-    ["fmj"] = {"FMJ",1750000, "10 - (smaller number better car"},
-    ["infernus"] = {"Infernus",440000, ""},
-    ["osiris"] = {"Osiris",1950000, "8 - (smaller number better car"},
-    ["le7b"] = {"RE-7B",5075000, "1 - (smaller number better car"},
-    ["reaper"] = {"Reaper",1595000, ""},
-    ["sultanrs"] = {"Sultan RS",795000, ""},
-    ["t20"] = {"T20",2200000,"7 - (smaller number better car"},
-    ["turismor"] = {"Turismo R",500000, "9 - (smaller number better car"},
-    ["tyrus"] = {"Tyrus",2550000, "5 - (smaller number better car"},
-    ["vacca"] = {"Vacca",240000, ""},
-    ["voltic"] = {"Voltic",150000, ""},
-    ["prototipo"] = {"X80 Proto",2700000, "6 - (smaller number better car"},
-    ["zentorno"] = {"Zentorno",725000,"3 - (smaller number better car"}
-  },
-
-  ["Muscle Cars"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["blade"] = {"Blade",160000, ""},
-    ["buccaneer"] = {"Buccaneer",29000, ""},
-    ["Chino"] = {"Chino",225000, ""},
-    ["coquette3"] = {"Coquette BlackFin",695000, ""},
-    ["dominator"] = {"Dominator",35000, ""},
-    ["dukes"] = {"Dukes",62000, ""},
-    ["gauntlet"] = {"Gauntlet",32000, ""},
-    ["hotknife"] = {"Hotknife",90000, ""},
-    ["faction"] = {"Faction",36000, ""},
-    ["nightshade"] = {"Nightshade",585000, ""},
-    ["picador"] = {"Picador",9000, ""},
-    ["sabregt"] = {"Sabre Turbo",15000, ""},
-    ["tampa"] = {"Tampa",375000, ""},
-    ["virgo"] = {"Virgo",195000, ""},
-    ["vigero"] = {"Vigero",21000, ""}
-  },
-
-  ["Off-Road"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["bifta"] = {"Bifta",75000, ""},
-    ["blazer"] = {"Blazer",8000, ""},
-    ["brawler"] = {"Brawler",715000, ""},
-    ["dubsta3"] = {"Bubsta 6x6",249000, ""},
-    ["dune"] = {"Dune Buggy",20000, ""},
-    ["rebel2"] = {"Rebel",22000, ""},
-    ["sandking"] = {"Sandking",38000, ""},
-    ["monster"] = {"The Liberator",550000, ""},
-    ["trophytruck"] = {"Trophy Truck",550000, ""}
-  },
-
-  ["SUVs"]  = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["baller"] = {"Baller",90000, ""},
-    ["cavalcade"] = {"Cavalcade",60000, ""},
-    ["granger"] = {"Grabger",35000, ""},
-    ["huntley"] = {"Huntley",195000, ""},
-    ["landstalker"] = {"Landstalker",58000, ""},
-    ["radi"] = {"Radius",32000, ""},
-    ["rocoto"] = {"Rocoto",85000, ""},
-    ["seminole"] = {"Seminole",30000, ""},
-    ["xls"] = {"XLS",253000, ""}
-  },
-
-  ["Vans"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["bison"] = {"Bison",30000, ""},
-    ["bobcatxl"] = {"Bobcat XL",23000, ""},
-    ["gburrito"] = {"Gang Burrito",65000, ""},
-    ["journey"] = {"Journey",15000, ""},
-    ["minivan"] = {"Minivan",30000, ""},
-    ["paradise"] = {"Paradise",25000, ""},
-    ["rumpo"] = {"Rumpo",13000, ""},
-    ["surfer"] = {"Surfer",11000, ""},
-    ["youga"] = {"Youga",16000, ""}
-  },
-
-  ["Sedans"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="car",blipid=50,blipcolor=4},
-    ["asea"] = {"Asea",1000000, ""},
-    ["asterope"] = {"Asterope",1000000, ""},
-    ["cognoscenti"] = {"Cognoscenti",1000000, ""},
-    ["cognoscenti2"] = {"Cognoscenti(Armored)",1000000, ""},
-    ["cog55"] = {"Cognoscenti 55",1000000, ""},
-    ["cog552"] = {"Cognoscenti 55(Armored)",1500000, ""},
-    ["fugitive"] = {"Fugitive",24000, ""},
-    ["glendale"] = {"Glendale",200000, ""},
-    ["ingot"] = {"Ingot",9000, ""},
-    ["intruder"] = {"Intruder",16000, ""},
-    ["premier"] = {"Premier",10000, ""},
-    ["primo"] = {"Primo",9000, ""},
-    ["primo2"] = {"Primo Custom",9500, ""},
-    ["regina"] = {"Regina",8000, ""},
-    ["schafter2"] = {"Schafter",65000, ""},
-    ["stanier"] = {"Stanier",10000, ""},
-    ["stratum"] = {"Stratum",10000, ""},
-    ["stretch"] = {"Stretch",30000, ""},
-    ["superd"] = {"Super Diamond",250000, ""},
-    ["surge"] = {"Surge",38000, ""},
-    ["tailgater"] = {"Tailgater",55000, ""},
-    ["warrener"] = {"Warrener",120000, ""},
-    ["washington"] = {"Washington",15000, ""}
-  },
-  
-  ["Motorcycles"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental"},vtype="bike",blipid=226,blipcolor=4},
-    ["AKUMA"] = {"Akuma",9000, ""},
-    ["bagger"] = {"Bagger",5000, ""},
-    ["bati"] = {"Bati 801",15000, ""},
-    ["bati2"] = {"Bati 801RR",15000, ""},
-    ["bf400"] = {"BF400",95000, ""},
-    ["carbonrs"] = {"Carbon RS",40000, ""},
-    ["cliffhanger"] = {"Cliffhanger",225000, ""},
-    ["daemon"] = {"Daemon",5000, ""},
-    ["double"] = {"Double T",12000, ""},
-    ["enduro"] = {"Enduro",48000, ""},
-    ["faggio2"] = {"Faggio",4000, ""},
-    ["gargoyle"] = {"Gargoyle",120000, ""},
-    ["hakuchou"] = {"Hakuchou",82000, ""},
-    ["hexer"] = {"Hexer",15000, ""},
-    ["innovation"] = {"Innovation",90000, ""},
-    ["lectro"] = {"Lectro",700000, ""},
-    ["nemesis"] = {"Nemesis",12000, ""},
-    ["pcj"] = {"PCJ-600",9000, ""},
-    ["ruffian"] = {"Ruffian",9000, ""},
-    ["sanchez"] = {"Sanchez",7000, ""},
-    ["sovereign"] = {"Sovereign",90000, ""},
-    ["thrust"] = {"Thrust",75000, ""},
-    ["vader"] = {"Vader",9000, ""},
-    ["vindicator"] = {"Vindicator",600000,""}
-  },
-  
-  ["Industrial"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="industrial",blipid=50,blipcolor=4},
-    ["guardian"] = {"Guardian",375000, ""},
-    ["bulldozer"] = {"Bulldozer",500000, ""},
-    ["cutter"] = {"Cutter",1100000, ""},
-    ["dump"] = {"Dump",800000, ""},
-    ["rubble"] = {"Rubble",215000, ""},
-    ["flatbed"] = {"Flatbed",90000, ""},
-    ["handler"] = {"Handler",110000, ""},
-    ["mixer"] = {"Mixer",125500, ""},
-    ["tiptruck"] = {"Tiptruck",85000, ""}
-  },
-  
-  ["Commercial"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="commercial",blipid=50,blipcolor=4},
-    ["benson"] = {"Benson",73000, ""},
-    ["biff"] = {"Biff",65000, ""},
-    ["hauler"] = {"Hauler",80000, ""},
-    ["mule"] = {"Mule",70000, ""},
-    ["packer"] = {"Packer",78600, ""},
-    ["phantom"] = {"Phantom",115200, ""},
-    ["pounder"] = {"Pounder",110000, ""}
-  },
-  
-  ["Emergency"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="emergency",blipid=50,blipcolor=4},
-    ["ambulance"] = {"Ambulance",83000, ""},
-    ["policet"] = {"Police Transport",110000, ""},
-    ["fbi"] = {"FBI",80000, ""},
-    ["firetruk"] = {"Firetruck",145200, ""},
-    ["lguard"] = {"Lifeguard",96300, ""},
-    ["pbus"] = {"Police Bus",60000, ""},
-    ["police"] = {"Police Cruiser",87000, ""},
-    ["pranger"] = {"Police Ranger",93000, ""},
-    ["riot"] = {"Police Riot",425000, ""},
-    ["sheriff"] = {"The Sheriff",90200, ""}
-  },
-  
-  ["Service"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="service",blipid=50,blipcolor=4},
-    ["bus"] = {"Bus",500000, ""},
-    ["coach"] = {"Coach",300000, ""},
-    ["airbus"] = {"Airbus",550000, ""},
-    ["rentalbus"] = {"Minibus",30000, ""},
-    ["taxi"] = {"Taxi",20000, ""},
-    ["trash"] = {"Trashmaster",90000, ""},
-    ["tourbus"] = {"Tour Bus",45000, ""}
-  },
-  
-  ["Military"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="military",blipid=50,blipcolor=4},
-    ["brickade"] = {"Brickade",1110000, ""},
-    ["barracks"] = {"Barracks",450000, ""},
-    ["crusader"] = {"Crusader",225000, ""},
-    ["rhino"] = {"Rhino",3000000, ""}
-  },
-  
-  ["Military Planes"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="mil_plane",blipid=16,blipcolor=4},
-    ["besra"] = {"Besra",1150000, ""},
-    ["hydra"] = {"Hydra",3990000, ""},
-    ["titan"] = {"Titan",2000000, ""},
-    ["lazer"] = {"P-996 LAZER",4700000, ""},
-    ["cargoplane"] = {"Cargo Plane",2100000, ""}
-  },
-  
-  ["Civilian Planes"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental","personal"},vtype="civ_plane",blipid=307,blipcolor=4},
-    ["nimbus"] = {"Nimbus",1900000, ""},
-    ["vestra"] = {"Vestra",950000, ""},
-    ["miljet"] = {"Miljet",1700000, ""},
-    ["dodo"] = {"Dodo",500000, ""},
-    ["velum"] = {"Velum",450000, ""},
-    ["cuban800"] = {"Cuban 800",240000, ""},
-    ["duster"] = {"Duster",275000, ""},
-    ["stunt"] = {"Stuntplane",150000, ""},
-    ["mammatus"] = {"Mammatus",300000, ""},
-    ["jet"] = {"Jet",1500000, ""},
-    ["shamal"] = {"Shamal",1150000, ""},
-    ["luxor"] = {"Luxor",1625000, ""}
-  },
-  
-  ["Military Helicopters"] = {
-    _config = {gpay="wallet",gtype={"rental"},vtype="mil_heli",blipid=64,blipcolor=4},
-    ["savage"] = {"Savage",2593500, ""},
-    ["valkyrie"] = {"Valkyrie",3790500, ""},
-    ["annihilator"] = {"Annihilator",2825000, ""},
-    ["buzzard"] = {"Buzzard",900000, ""},
-    ["cargobob"] = {"Cargobob",2200000, ""}
-  },
-  
-  ["Civilian Helicopters"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental","personal"},vtype="civ_heli",blipid=43,blipcolor=4},
-    ["supervolito"] = {"Super Volito",2113000, ""},
-    ["volatus"] = {"Volatus",2295000, ""},
-    ["swift"] = {"Swift",1500000, ""},
-    ["skylift"] = {"Skylift",1745000, ""},
-    ["maverick"] = {"Maverick",780000, ""},
-    ["frogger"] = {"Frogger",1300000, ""}
-  },
-  
-  ["Boats"] = {
-    _config = {gpay="bank",gtype={"showroom","store","rental","personal"},vtype="boat",blipid=266,blipcolor=4},
-    ["tug"] = {"Tug Boat",1250000, ""},
-    ["squalo"] = {"Squalo",196621, ""},
-    ["marquis"] = {"Marquis",413990, ""},
-    ["speeder"] = {"Speeder",325000, ""},
-    ["dinghy"] = {"Dinghy",166250, ""},
-    ["jetmax"] = {"Jetmax",299000, ""},
-    ["predator"] = {"Predator",825710, ""},
-    ["tropic"] = {"Tropic",22000, ""},
-    ["seashark"] = {"Seashark",16899, ""},
-    ["submersible"] = {"Submersible",1150000, ""},
-    ["submersible2"] = {"Kraken",1325000, ""},
-    ["suntrap"] = {"Suntrap",25160, ""},
-    ["toro"] = {"Toro",1750000, ""}
-  },
-  
-  ["Personal"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3},
-	-- Vehicles of differenty vtype can be added to the personal garage, adding to one means adding to all of the same vtype
-    ["AKUMA"] = {"Akuma",9000, ""},
-    ["bagger"] = {"Bagger",5000, ""},
-    ["bati"] = {"Bati 801",15000, ""},
-    ["bati2"] = {"Bati 801RR",15000, ""},
-    ["bf400"] = {"BF400",95000, ""},
-    ["carbonrs"] = {"Carbon RS",40000, ""},
-    ["cliffhanger"] = {"Cliffhanger",225000, ""},
-    ["daemon"] = {"Daemon",5000, ""},
-    ["double"] = {"Double T",12000, ""},
-    ["enduro"] = {"Enduro",48000, ""},
-    ["faggio2"] = {"Faggio",4000, ""},
-    ["gargoyle"] = {"Gargoyle",120000, ""},
-    ["hakuchou"] = {"Hakuchou",82000, ""},
-    ["hexer"] = {"Hexer",15000, ""},
-    ["innovation"] = {"Innovation",90000, ""},
-    ["lectro"] = {"Lectro",700000, ""},
-    ["nemesis"] = {"Nemesis",12000, ""},
-    ["pcj"] = {"PCJ-600",9000, ""},
-    ["ruffian"] = {"Ruffian",9000, ""},
-    ["sanchez"] = {"Sanchez",7000, ""},
-    ["sovereign"] = {"Sovereign",90000, ""},
-    ["thrust"] = {"Thrust",75000, ""},
-    ["vader"] = {"Vader",9000, ""},
-    ["vindicator"] = {"Vindicator",600000,""}
-  },
-  
-  ["Ranch Main"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Ranch Main"},
-  },
-  ["Rich Housing"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Rich Housing"},
-  },
-  ["Rich Housing 2"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Rich Housing 2"},
-  },
-  ["Basic Housing 1"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Basic Housing 1"},
-  },
-  ["Basic Housing 2"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Basic Housing 2"},
-  },
-  ["Regular House 1"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 1"},
-  },
-  ["Regular House 2"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 2"},
-  },
-  ["Regular House 3"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 3"},
-  },
-  ["Regular House 4"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 4"},
-  },
-  ["Regular House 5"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 5"},
-  },
-  ["Regular House 6"]  = {
-    _config = {gpay="wallet",gtype={"personal"},vtype="car",blipid=357,blipcolor=3,ghome="Regular House 6"},
-  },
-
-  ["LS Customs"]  = {
-    _config = {gpay="wallet",gtype={"shop"},vtype="car",blipid=72,blipcolor=7},
-	_shop = {
-	  -- You can make different shops with different modifications for each garage of gtype shop
-	  [0] = {"Spoilers",500,""},
-	  [1] = {"Front Bumper",500,""},
-      [2] = {"Rear Bumper",500,""},
-      [3] = {"Side Skirt",500,""},
-      [4] = {"Exhaust",500,""},
-      [5] = {"Frame",500,""},
-      [6] = {"Grille",500,""},
-      [7] = {"Hood",500,""},
-      [8] = {"Fender",500,""},
-      [9] = {"Right Fender",500,""},
-      [10] = {"Roof",500,""},
-      [11] = {"Engine",500,""},
-      [12] = {"Brakes",500,""},
-      [13] = {"Transmission",500,""},
-      [14] = {"Horns",500,""},
-      [15] = {"Suspension",500,""},
-      [16] = {"Armor",500,""},
-      [18] = {"Turbo",500,""},
-      [20] = {"Tire Smoke",500,""},
-      [22] = {"Xenon Headlights",500,""},
-      [23] = {"Wheels",500,"Press enter to change wheel type"},
-      [24] = {"Back Wheels (Bike)",500,""},
-      [25] = {"Plateholders",500,""},
-      [27] = {"Trims",500,""},
-      [28] = {"Ornaments",500,""},
-      [29] = {"Dashboards",500,""},
-      [30] = {"Dials",500,""},
-      [31] = {"Door Speakers",500,""},
-      [32] = {"Seats",500,""},
-      [33] = {"Steering Wheel",500,""},
-      [34] = {"H Shift",500,""},
-      [35] = {"Plates",500,""},
-      [36] = {"Speakers",500,""},
-      [37] = {"Trunks",500,""},
-      [38] = {"Hydraulics",500,""},
-      [39] = {"Engine Block",500,""},
-      [40] = {"Air Filter",500,""},
-      [41] = {"Struts",500,""},
-      [42] = {"Arch Covers",500,""},
-      [43] = {"Arials",500,""},
-      [44] = {"Extra Trims",500,""},
-      [45] = {"Tanks",500,""},
-      [46] = {"Windows",500,""},
-      [48] = {"Livery",500,""},
+cfg.garage_types = {
+	["Garagem"] = {
+		_config = { gtype={"personal"} }
+	},
+	["Bulbasaur"]  = {
+		_config = { gtype={"personal"},ghome="Bulbasaur" }
+	},
+	["Ivysaur"]  = {
+		_config = { gtype={"personal"},ghome="Ivysaur" }
+	},
+	["Venusaur"]  = {
+		_config = { gtype={"personal"},ghome="Venusaur" }
+	},
+	["Squirtle"]  = {
+		_config = { gtype={"personal"},ghome="Squirtle" }
+	},
+	["Blastoise"]  = {
+		_config = { gtype={"personal"},ghome="Blastoise" }
+	},
+	["Metapod"]  = {
+		_config = { gtype={"personal"},ghome="Metapod" }
+	},
+	["Clefairy"]  = {
+		_config = { gtype={"personal"},ghome="Clefairy" }
+	},
+	["Clefable"]  = {
+		_config = { gtype={"personal"},ghome="Clefable" }
+	},
+	["Vulpix"]  = {
+		_config = { gtype={"personal"},ghome="Vulpix" }
+	},
+	["Ninetales"]  = {
+		_config = { gtype={"personal"},ghome="Ninetales" }
+	},
+	["Jigglypuff"]  = {
+		_config = { gtype={"personal"},ghome="Jigglypuff" }
+	},
+	["Wigglytuff"]  = {
+		_config = { gtype={"personal"},ghome="Wigglytuff" }
+	},
+	["Zubat"]  = {
+		_config = { gtype={"personal"},ghome="Zubat" }
+	},
+	["Golbat"]  = {
+		_config = { gtype={"personal"},ghome="Golbat" }
+	},
+	["Oddish"]  = {
+		_config = { gtype={"personal"},ghome="Oddish" }
+	},
+	["Gloom"]  = {
+		_config = { gtype={"personal"},ghome="Gloom" }
+	},
+	["Vileplume"]  = {
+		_config = { gtype={"personal"},ghome="Vileplume" }
+	},
+	["Machoke"]  = {
+		_config = { gtype={"personal"},ghome="Machoke" }
+	},
+	["Machamp"]  = {
+		_config = { gtype={"personal"},ghome="Machamp" }
+	},
+	["Bellsprout"]  = {
+		_config = { gtype={"personal"},ghome="Bellsprout" }
+	},
+	["Weepinbell"]  = {
+		_config = { gtype={"personal"},ghome="Weepinbell" }
+	},
+	["Victreebel"]  = {
+		_config = { gtype={"personal"},ghome="Victreebel" }
+	},
+	["Tentacool"]  = {
+		_config = { gtype={"personal"},ghome="Tentacool" }
+	},
+	["Tentacruel"]  = {
+		_config = { gtype={"personal"},ghome="Tentacruel" }
+	},
+	["Geodude"]  = {
+		_config = { gtype={"personal"},ghome="Geodude" }
+	},
+	["Graveler"]  = {
+		_config = { gtype={"personal"},ghome="Graveler" }
+	},
+	["Golem"]  = {
+		_config = { gtype={"personal"},ghome="Golem" }
+	},
+	["Ponyta"]  = {
+		_config = { gtype={"personal"},ghome="Ponyta" }
+	},
+	["Rapidash"]  = {
+		_config = { gtype={"personal"},ghome="Rapidash" }
+	},
+	["Slowpoke"]  = {
+		_config = { gtype={"personal"},ghome="Slowpoke" }
+	},
+	["Slowbro"]  = {
+		_config = { gtype={"personal"},ghome="Slowbro" }
+	},
+	["Magnemite"]  = {
+		_config = { gtype={"personal"},ghome="Magnemite" }
+	},
+	["Magneton"]  = {
+		_config = { gtype={"personal"},ghome="Magneton" }
+	},
+	["Doduo"]  = {
+		_config = { gtype={"personal"},ghome="Doduo" }
+	},
+	["Carros"] = {
+		_config = { gtype={"store"},permissions={"vendedor.permissao"}  },
+		["blista"] = { "blista",60000,40,3 },
+		["brioso"] = { "brioso",30000,30,3 },
+		["dilettante"] = { "dilettante",60000,50,3 },
+		["issi2"] = { "issi2",90000,50,3 },
+		["panto"] = { "panto",5000,20,-1 },
+		["prairie"] = { "prairie",10000,25,-1 },
+		["rhapsody"] = { "rhapsody",7000,30,-1 },
+		["cogcabrio"] = { "cogcabrio",120000,60,3 },
+		["exemplar"] = { "exemplar",80000,20,3 },
+		["f620"] = { "f620",55000,30,5 },
+		["felon"] = { "felon",70000,50,5 },
+		["ingot"] = { "ingot",160000,60,3 },
+		["felon2"] = { "felon2",80000,40,5 },
+		["jackal"] = { "jackal",60000,30,3 },
+		["oracle"] = { "oracle",60000,50,5 },
+		["oracle2"] = { "oracle2",80000,60,5 },
+		["sentinel"] = { "sentinel",50000,40,7 },
+		["sentinel2"] = { "sentinel2",60000,50,7 },
+		["windsor"] = { "windsor",150000,20,3 },
+		["windsor2"] = { "windsor2",170000,40,3 },
+		["zion"] = { "zion",50000,40,5 },
+		["zion2"] = { "zion2",60000,50,12 },
+		["blade"] = { "blade",100000,40,3 },
+		["buccaneer"] = { "buccaneer",120000,50,3 },
+		["buccaneer2"] = { "buccaneer2",240000,60,3 },
+		["primo"] = { "primo",120000,50,3 },
+		["primo2"] = { "primo2",240000,60,3 },
+		["chino"] = { "chino",120000,50,3 },
+		["chino2"] = { "chino2",240000,60,3 },
+		["coquette3"] = { "coquette3",170000,40,3 },
+		["dominator"] = { "dominator",180000,50,3 },
+		["dukes"] = { "dukes",150000,40,3 },
+		["faction"] = { "faction",150000,50,3 },
+		["faction2"] = { "faction2",200000,40,3 },
+		["faction3"] = { "faction3",350000,60,3 },
+		["gauntlet"] = { "gauntlet",145000,40,3 },
+		["hermes"] = { "hermes",280000,70,3 },
+		["hotknife"] = { "hotknife",180000,30,3 },
+		["moonbeam"] = { "moonbeam",180000,80,3 },
+		["moonbeam2"] = { "moonbeam2",220000,70,3 },
+		["nightshade"] = { "nightshade",270000,30,3 },
+		["picador"] = { "picador",150000,90,3 },
+		["ratloader2"] = { "ratloader2",180000,70,3 },
+		["ruiner"] = { "ruiner",150000,50,3 },
+		["sabregt"] = { "sabregt",240000,60,3 },
+		["sabregt2"] = { "sabregt2",150000,60,3 },
+		["slamvan"] = { "slamvan",150000,80,3 },
+		["slamvan2"] = { "slamvan2",190000,80,3 },
+		["slamvan3"] = { "slamvan3",200000,80,3 },
+		["stalion"] = { "stalion",150000,30,3 },
+		["tampa"] = { "tampa",170000,40,3 },
+		["vigero"] = { "vigero",170000,30,3 },
+		["virgo"] = { "virgo",150000,60,3 },
+		["virgo2"] = { "virgo2",250000,50,3 },
+		["virgo3"] = { "virgo3",180000,60,3 },
+		["voodoo"] = { "voodoo",220000,60,3 },
+		["yosemite"] = { "yosemite",350000,100,3 },
+		["bfinjection"] = { "bfinjection",80000,20,3 },
+		["bifta"] = { "bifta",190000,20,3 },
+		["bodhi2"] = { "bodhi2",170000,90,3 },
+		["dubsta3"] = { "dubsta3",240000,70,3 },
+		["mesa3"] = { "mesa3",160000,60,3 },
+		["rancherxl"] = { "rancherxl",200000,70,3 },
+		["rebel"] = { "rebel",220000,100,3 },
+		["rebel2"] = { "rebel2",250000,100,3 },
+		["riata"] = { "riata",250000,80,3 },
+		["dloader"] = { "dloader",150000,40,3 },
+		["sandking"] = { "sandking",350000,100,3 },
+		["sandking2"] = { "sandking2",300000,100,3 },
+		["baller"] = { "baller",120000,50,3 },
+		["baller2"] = { "baller2",130000,50,3 },
+		["baller3"] = { "baller3",140000,50,3 },
+		["baller4"] = { "baller4",150000,50,3 },
+		["baller5"] = { "baller5",300000,50,3 },
+		["baller6"] = { "baller6",310000,50,3 },
+		["bjxl"] = { "bjxl",100000,50,3 },
+		["cavalcade"] = { "cavalcade",110000,60,3 },
+		["cavalcade2"] = { "cavalcade2",130000,60,3 },
+		["contender"] = { "contender",240000,70,3 },
+		["dubsta"] = { "dubsta",150000,80,3 },
+		["dubsta2"] = { "dubsta2",180000,80,3 },
+		["fq2"] = { "fq2",100000,50,3 },
+		["granger"] = { "granger",280000,100,3 },
+		["gresley"] = { "gresley",150000,50,3 },
+		["habanero"] = { "habanero",100000,50,3 },
+		["seminole"] = { "seminole",110000,60,3 },
+		["serrano"] = { "serrano",150000,50,3 },
+		["xls"] = { "xls",150000,50,3 },
+		["xls2"] = { "xls2",350000,50,3 },
+		["asea"] = { "asea",50000,30,3 },
+		["asterope"] = { "asterope",60000,30,3 },
+		["cog55"] = { "cog55",200000,50,3 },
+		["cog552"] = { "cog552",350000,50,3 },
+		["cognoscenti"] = { "cognoscenti",250000,50,3 },
+		["cognoscenti2"] = { "cognoscenti2",350000,50,3 },
+		["stanier"] = { "stanier",60000,60,3 },
+		["stratum"] = { "stratum",70000,70,3 },
+		["superd"] = { "superd",200000,50,3 },
+		["surge"] = { "surge",100000,60,3 },
+		["tailgater"] = { "tailgater",100000,50,3 },
+		["warrener"] = { "warrener",90000,40,3 },
+		["washington"] = { "washington",120000,60,3 },
+		["alpha"] = { "alpha",160000,40,3 },
+		["banshee"] = { "banshee",240000,30,3 },
+		["bestiagts"] = { "bestiagts",220000,60,3 },
+		["blista2"] = { "blista2",50000,40,3 },
+		["blista3"] = { "blista3",70000,40,3 },
+		["buffalo"] = { "buffalo",240000,50,3 },
+		["buffalo2"] = { "buffalo2",240000,50,3 },
+		["carbonizzare"] = { "carbonizzare",250000,50,3 },
+		["comet2"] = { "comet2",200000,40,3 },
+		["comet3"] = { "comet3",230000,40,3 },
+		["coquette"] = { "coquette",200000,30,3 },
+		["elegy"] = { "elegy",260000,50,5 },
+		["elegy2"] = { "elegy2",280000,30,3 },
+		["feltzer2"] = { "feltzer2",200000,50,3 },
+		["furoregt"] = { "furoregt",250000,30,3 },
+		["fusilade"] = { "fusilade",180000,50,3 },
+		["futo"] = { "futo",150000,40,5 },
+		["jester"] = { "jester",120000,30,15 },
+		["khamelion"] = { "khamelion",180000,50,3 },
+		["kuruma"] = { "kuruma",240000,50,3 },
+		["massacro"] = { "massacro",290000,50,3 },
+		["ninef"] = { "ninef",250000,40,3 },
+		["ninef2"] = { "ninef2",250000,40,3 },
+		["omnis"] = { "omnis",210000,20,3 },
+		["pariah"] = { "pariah",400000,30,3 },
+		["penumbra"] = { "penumbra",120000,40,3 },
+		["raiden"] = { "raiden",210000,70,5 },
+		["rapidgt"] = { "rapidgt",220000,20,3 },
+		["rapidgt2"] = { "rapidgt2",240000,20,3 },
+		["ruston"] = { "ruston",300000,20,3 },
+		["schafter3"] = { "schafter3",180000,50,3 },
+		["schafter4"] = { "schafter4",190000,50,3 },
+		["schwarzer"] = { "schwarzer",150000,50,3 },
+		["sentinel3"] = { "sentinel3",150000,30,7 },
+		["seven70"] = { "seven70",300000,20,3 },
+		["specter"] = { "specter",280000,20,3 },
+		["specter2"] = { "specter2",310000,20,3 },
+		["streiter"] = { "streiter",200000,70,3 },
+		["sultan"] = { "sultan",150000,50,3 },
+		["surano"] = { "surano",270000,30,3 },
+		["tampa2"] = { "tampa2",180000,20,3 },
+		["tropos"] = { "tropos",150000,20,3 },
+		["verlierer2"] = { "verlierer2",330000,20,3 },
+		["btype"] = { "btype",320000,40,3 },
+		["btype2"] = { "btype2",400000,20,3 },
+		["btype3"] = { "btype3",340000,40,3 },
+		["casco"] = { "casco",310000,50,3 },
+		["cheetah"] = { "cheetah",370000,20,3 },
+		["coquette2"] = { "coquette2",250000,40,3 },
+		["feltzer3"] = { "feltzer3",200000,50,3 },
+		["gt500"] = { "gt500",250000,40,3 },
+		["infernus2"] = { "infernus2",250000,20,3 },
+		["jb700"] = { "jb700",200000,30,3 },
+		["mamba"] = { "mamba",240000,50,3 },
+		["manana"] = { "manana",120000,70,3 },
+		["monroe"] = { "monroe",240000,20,3 },
+		["peyote"] = { "peyote",150000,70,3 },
+		["pigalle"] = { "pigalle",250000,60,3 },
+		["rapidgt3"] = { "rapidgt3",190000,40,3 },
+		["retinue"] = { "retinue",150000,40,3 },
+		["stinger"] = { "stinger",200000,60,3 },
+		["stingergt"] = { "stingergt",230000,20,3 },
+		["torero"] = { "torero",160000,30,3 },
+		["tornado"] = { "tornado",140000,70,3 },
+		["tornado2"] = { "tornado2",160000,60,3 },
+		["tornado5"] = { "tornado5",250000,60,3 },
+		["turismo2"] = { "turismo2",250000,30,3 },
+		["viseris"] = { "viseris",210000,30,3 },
+		["ztype"] = { "ztype",400000,20,3 },
+		["adder"] = { "adder",500000,20,3 },
+		["autarch"] = { "autarch",610000,20,3 },
+		["banshee2"] = { "banshee2",300000,20,3 },
+		["bullet"] = { "bullet",350000,20,3 },
+		["cheetah2"] = { "cheetah2",210000,20,3 },
+		["entityxf"] = { "entityxf",400000,20,3 },
+		["fmj"] = { "fmj",450000,20,3 },
+		["gp1"] = { "gp1",430000,20,3 },
+		["infernus"] = { "infernus",410000,20,3 },
+		["nero"] = { "nero",390000,30,3 },
+		["nero2"] = { "nero2",420000,20,3 },
+		["osiris"] = { "osiris",400000,20,3 },
+		["penetrator"] = { "penetrator",420000,20,3 },
+		["pfister811"] = { "pfister811",460000,20,3 },
+		["reaper"] = { "reaper",500000,20,3 },
+		["sc1"] = { "sc1",430000,20,3 },
+		["sultanrs"] = { "sultanrs",300000,30,5 },
+		["t20"] = { "t20",500000,20,3 },
+		["tempesta"] = { "tempesta",520000,20,3 },
+		["turismor"] = { "turismor",500000,20,3 },
+		["tyrus"] = { "tyrus",500000,20,3 },
+		["vacca"] = { "vacca",500000,30,3 },
+		["visione"] = { "visione",600000,20,3 },
+		["voltic"] = { "voltic",380000,20,3 },
+		["zentorno"] = { "zentorno",700000,20,3 },
+		["sadler"] = { "sadler",180000,70,3 },
+		["bison"] = { "bison",200000,70,3 },
+		["bison2"] = { "bison2",180000,70,3 },
+		["bobcatxl"] = { "bobcatxl",240000,100,3 },
+		["burrito"] = { "burrito",240000,100,3 },
+		["burrito2"] = { "burrito2",240000,100,3 },
+		["burrito3"] = { "burrito3",240000,100,3 },
+		["burrito4"] = { "burrito4",240000,100,3 },
+		["minivan"] = { "minivan",100000,70,3 },
+		["minivan2"] = { "minivan2",200000,60,3 },
+		["paradise"] = { "paradise",240000,100,3 },
+		["pony"] = { "pony",240000,100,3 },
+		["pony2"] = { "pony2",240000,100,3 },
+		["rumpo"] = { "rumpo",240000,100,3 },
+		["rumpo2"] = { "rumpo2",240000,100,3 },
+		["rumpo3"] = { "rumpo3",250000,100,3 },
+		["speedo"] = { "speedo",240000,100,3 },
+		["surfer"] = { "surfer",50000,80,12 },
+		["youga"] = { "youga",240000,100,3 },
+		["youga2"] = { "youga2",240000,100,3 },
+		["huntley"] = { "huntley",100000,60,3 },
+		["landstalker"] = { "landstalker",130000,70,3 },
+		["mesa"] = { "mesa",90000,50,3 },
+		["patriot"] = { "patriot",250000,70,3 },
+		["radi"] = { "radi",100000,50,3 },
+		["rocoto"] = { "rocoto",100000,60,3 },
+		["tyrant"] = { "tyrant",600000,30,3 },
+		["entity2"] = { "entity2",480000,20,3 },
+		["cheburek"] = { "cheburek",150000,50,3 },
+		["hotring"] = { "hotring",300000,60,3 },
+		["jester3"] = { "jester3",240000,30,3 },
+		["flashgt"] = { "flashgt",320000,50,3 },
+		["ellie"] = { "ellie",300000,50,3 },
+		["michelli"] = { "michelli",160000,40,3 },
+		["fagaloa"] = { "fagaloa",300000,80,3 },
+		["dominator3"] = { "dominator3",300000,30,3 },
+		["issi3"] = { "issi3",160000,20,3 },
+		["taipan"] = { "taipan",500000,20,3 },
+		["gb200"] = { "gb200",170000,20,3 },
+		["stretch"] = { "stretch",500000,60,3 },
+		["guardian"] = { "guardian",500000,100,3 },
+		["kamacho"] = { "kamacho",400000,70,3 },
+		["neon"] = { "neon",300000,30,7 },
+		["cyclone"] = { "cyclone",800000,20,3 },
+		["italigtb"] = { "italigtb",520000,20,3 },
+		["italigtb2"] = { "italigtb2",530000,20,3 },
+		["vagner"] = { "vagner",590000,20,3 },
+		["xa21"] = { "xa21",550000,20,3 },
+		["tezeract"] = { "tezeract",800000,20,3 },
+		["prototipo"] = { "prototipo",900000,20,3 },
+		["patriot2"] = { "patriot2",550000,60,3 },
+		["speedo4"] = { "speedo4",240000,100,3 },
+		["stafford"] = { "stafford",400000,40,3 },
+		["swinger"] = { "swinger",250000,20,3 },
+		["brutus"] = { "brutus",350000,100,3 },
+		["clique"] = { "clique",360000,40,3 },
+		["deveste"] = { "deveste",800000,20,3 },
+		["deviant"] = { "deviant",300000,50,3 },
+		["impaler"] = { "impaler",300000,60,3 },
+		["imperator"] = { "imperator",400000,50,3 },
+		["italigto"] = { "italigto",700000,30,3 },
+		["schlagen"] = { "schlagen",600000,30,3 },
+		["toros"] = { "toros",400000,50,3 },
+		["tulip"] = { "tulip",300000,60,3 },
+		["vamos"] = { "vamos",320000,60,3 }
+	},
+	["Motos"] = {
+		_config = { gtype={"store"},permissions={"vendedor.permissao"}  },
+		["akuma"] = { "akuma",420000,15,5 },
+		["avarus"] = { "avarus",350000,15,3 },
+		["bagger"] = { "bagger",240000,40,3 },
+		["bati"] = { "bati",300000,15,15 },
+		["bf400"] = { "bf400",260000,15,15 },
+		["carbonrs"] = { "carbonrs",300000,15,3 },
+		["chimera"] = { "chimera",280000,15,3 },
+		["cliffhanger"] = { "cliffhanger",250000,15,3 },
+		["daemon"] = { "daemon",200000,15,3 },
+		["daemon2"]  = { "daemon2",200000,15,3 },
+		["defiler"] = { "defiler",380000,15,3 },
+		["diablous"] = { "diablous",350000,15,3 },
+		["diablous2"] = { "diablous2",380000,15,3 },
+		["double"] = { "double",300000,15,3 },
+		["enduro"] = { "enduro",160000,15,3 },
+		["esskey"] = { "esskey",260000,15,3 },
+		["faggio"] = { "faggio",4000,30,-1 },
+		["faggio2"] = { "faggio2",5000,30,-1 },
+		["faggio3"] = { "faggio3",5000,30,-1 },
+		["fcr"] = { "fcr",320000,15,3 },
+		["fcr2"] = { "fcr2",320000,15,3 },
+		["gargoyle"] = { "gargoyle",280000,15,3 },
+		["hakuchou"] = { "hakuchou",310000,15,3 },
+		["hakuchou2"] = { "hakuchou2",450000,15,3 },
+		["hexer"] = { "hexer",180000,15,3 },
+		["innovation"] = { "innovation",210000,15,3 },
+		["lectro"] = { "lectro",310000,15,3 },
+		["manchez"] = { "manchez",290000,15,3 },
+		["nemesis"] = { "nemesis",280000,15,3 },
+		["nightblade"] = { "nightblade",340000,15,5 },
+		["pcj"] = { "pcj",180000,15,3 },
+		["ruffian"] = { "ruffian",280000,15,3 },
+		["sanchez"] = { "sanchez",150000,15,15 },
+		["sanchez2"] = { "sanchez2",150000,15,15 },
+		["sanctus"] = { "sanctus",350000,15,3 },
+		["sovereign"] = { "sovereign",240000,50,3 },
+		["thrust"] = { "thrust",300000,15,3 },
+		["vader"] = { "vader",280000,15,3 },
+		["vindicator"] = { "vindicator",250000,15,3 },
+		["vortex"] = { "vortex",300000,15,3 },
+		["wolfsbane"] = { "wolfsbane",230000,15,3 },
+		["zombiea"] = { "zombiea",230000,15,3 },
+		["zombieb"] = { "zombieb",235000,15,3 },
+		["blazer"] = { "blazer",200000,15,3 },
+		["blazer4"] = { "blazer4",300000,15,3 },
+		["deathbike"] = { "deathbike",350000,15,3 },
+		["shotaro"] = { "shotaro",1000000,15,2 }
+	},
+	["Importados"] = {
+	    _config = { gtype={"store"},permissions={"noset.permissao"}  },
+		["ferrariitalia"] = { "ferrari italia",1500000,40,3 },
+		["fordmustang"] = { "ford mustang",1000000,40,3 },
+		["nissangtr"] = { "nissan gtr",1150000,40,3 },
+		["nissangtrnismo"] = { "nissan gtr nismo",1200000,40,3 },
+		["teslaprior"] = { "tesla prior",700000,50,5 },
+		["nissanskyliner34"] = { "skyline r34",1100000,60,3 },
+		["audirs6"] = { "audi rs6",850000,40,3 },
+		["bmwm3f80"] = { "bmw m3 f80",900000,50,3 },
+		["bmwm4gts"] = { "bmw m4 gts",950000,50,3 },
+		["lancerevolutionx"] = { "lancer evolution x",850000,50,5 },
+		["toyotasupra"] = { "toyota supra",1050000,35,3 },
+		["nissan370z"] = { "nissan 370z",550000,30,5 },
+		["lamborghinihuracan"] = { "lamborghini huracan",1300000,40,3 },
+		["dodgechargersrt"] = { "dodge charger srt",1400000,60,3 },
+		["mazdarx7"] = { "mazda rx7",1000000,40,3 }
+	},
+	["Motorista"] = {
+		_config = { gtype={"rent"} },
+		["coach"] = { "coach",0,0,-1 }
+	},
+	["Policia"] = {
+		_config = { gtype={"rent"},permissions={"policia.permissao"} },
+		["policiacharger2018"] = { "Dodge Charger 2018",0,0,-1 },
+		["policiasilverado"] = { "Chevrolet Silverado",0,0,-1 },
+		["policiatahoe"] = { "Chevrolet Tahoe",0,0,-1 },
+		["policiataurus"] = { "Ford Taurus",0,0,-1 },
+		["policiavictoria"] = { "Crown Victoria",0,0,-1 },
+		["policiabmwr1200"] = { "BMW R1200",0,0,-1 },
+		["policiaheli"] = { "Helicóptero",0,0,-1 },
+		["pbus"] = { "Ônibus",0,0,-1 }
+	},
+	["locadora"] = {
+		_config = { gtype={"rent"} },
+		["panto"] = { "´Panto",500,15,3 },
+		["boxville"] = { "Boxville",300,15,3 },	
+		["sandking"] = { "sandking",800,15,3 },
+		["sanchez2"] = { "sanchez",600,15,3 },
+		["nero2"] = { "Nero",2500,15,3 },
+		["t20"] = { "T20",2000,15,3 }
+	},
+	["Paramedico"] = {
+		_config = { gtype={"rent"},permissions={"paramedico.permissao"} },
+		["paramedicoambu"] = { "Ambulância",0,0,-1 },
+		["paramedicocharger2014"] = { "Dodge Charger 2014",0,0,-1 },
+		["paramedicoheli"] = { "Helicóptero",0,0,-1 }
+	},
+	["Mecanico"] = {
+		_config = { gtype={"rent"},permissions={"mecanico.permissao"} },
+		["flatbed"] = { "Reboque",0,0,-1 }
+	},
+	["Taxista"] = {
+		_config = { gtype={"rent"},permissions={"taxista.permissao"} },
+		["taxi"] = { "Taxi",0,0,-1 }
+	},
+	["Carteiro"] = {
+		_config = { gtype={"rent"} },
+		["boxville2"] = { "Caminhão",0,0,-1 },
+		["tribike3"] = { "Bicicleta",0,0,-1 }
+	},
+	["motoclube"] = {
+		_config = { gtype={"rent"} },
+		["sanctus"] = { "sanctus",0,0,-1 },
+		["nightblade"] = { "nightblade",0,0,-1 },
+		["gargoyle"] = { "gargoyle",0,0,-1 },
+		["zombieb"] = { "zombieb",0,0,-1 },
+		["zombiea"] = { "zombiea",0,0,-1 }
+	},
+	["Lixeiro"] = {
+		_config = { gtype={"rent"} },
+		["trash"] = { "Caminhão 01",0,0,-1 },
+		["trash2"] = { "Caminhão 02",0,0,-1 }     
+	},
+	
+	["Bicicletario"] = {
+		_config = { gtype={"rent"} },
+		["scorcher"] = { "Scorcher",0,0,-1 },
+		["tribike"] = { "Tribike Verde",0,0,-1 },
+		["tribike2"] = { "Tribike Vermelha",0,0,-1 },
+		["fixter"] = { "Fixter",0,0,-1 },
+		["cruiser"] = { "Cruiser",0,0,-1 },
+		["bmx"] = { "Bmx",0,0,-1 }
+	},
+	["Embarcacoes"] = {
+		_config = { gtype={"rent"} },
+		["dinghy"] = { "dinghy",0,0,-1 },
+		["jetmax"] = { "jetmax",0,0,-1 },
+		["marquis"] = { "marquis",0,0,-1 },
+		["seashark3"] = { "seashark3",0,0,-1 },
+		["speeder"] = { "speeder",0,0,-1 },
+		["speeder2"] = { "speeder2",0,0,-1 },
+		["squalo"] = { "squalo",0,0,-1 },
+		["suntrap"] = { "suntrap",0,0,-1 },
+		["toro"] = { "toro",0,0,-1 },
+		["toro2"] = { "toro2",0,0,-1 },
+		["tropic"] = { "tropic",0,0,-1 },
+		["tropic2"] = { "tropic2",0,0,-1 }
+	},
+	["Caminhao"] = {
+		_config = { gtype={"rent"} },
+		["phantom"] = { "caminhão 01",0,0,-1 },
+		["packer"] = { "caminhão 02",0,0,-1 }
+	},
+	["oficina"] = {
+		_config = { gtype={"shop"},permissions={"mecanico.permissao"} },
+		_shop = {
+			[0] = { "Aerofolio",3000,"" },
+			[1] = { "Saia Frontal",3000,"" },
+			[2] = { "Saia Traseira",3000,"" },
+			[3] = { "Saia",3000,"" },
+			[4] = { "Escapamento",3000,"" },
+			[5] = { "Interior",3000,"" },
+			[6] = { "Grades",3000,"" },
+			[7] = { "Capo",3000,"" },
+			[8] = { "Parachoque Direito",3000,"" },
+			[9] = { "Parachoque Esquerdo",3000,"" },
+			[10] = { "Tetos",3000,"" },
+			[11] = { "Motor",50000,"" },
+			[12] = { "Freios",45000,"" },
+			[13] = { "Transmissao",45000,"" },
+			[14] = { "Buzina",3000,"" },
+			[15] = { "Suspensao",36000,"" },
+			[16] = { "Blindagem",90000,"" },
+			[18] = { "Turbo",15000,"" },
+			[20] = { "Fumaca",3000,"" },
+			[22] = { "Farois",3000,"" },
+			[23] = { "Rodas",7500,"" },
+			[24] = { "Rodas Traseiras",3000,"" },
+			[25] = { "Suporte de Placa",3000,"" },
+			[27] = { "Trims",3000,"" },
+			[28] = { "Enfeites",3000,"" },
+			[29] = { "Painel",3000,"" },
+			[30] = { "Lanterna",3000,"" },
+			[31] = { "Macaneta",3000,"" },
+			[32] = { "Bancos",3000,"" },
+			[33] = { "Volante",3000,"" },
+			[34] = { "H Shift",3000,"" },
+			[35] = { "Placas",3000,"" },
+			[36] = { "Caixa de Som",3000,"" },
+			[37] = { "Porta-Malas",3000,"" },
+			[38] = { "Hidraulica",7500,"" },
+			[39] = { "Placa de Motor",6000,"" },
+			[40] = { "Filtro de Ar",3000,"" },
+			[41] = { "Struts",3000,"" },
+			[42] = { "Capas",3000,"" },
+			[43] = { "Antenas",3000,"" },
+			[44] = { "Extra Trims",3000,"" },
+			[45] = { "Tanque",3000,"" },
+			[46] = { "Vidros",3000,"" },
+			[48] = { "Livery",3000,"" },
+			[49] = { "Tiras",0,"" }
+		}
 	}
-  },
 }
 
--- position garages on the map {garage_type,x,y,z}
 cfg.garages = {
-
-  -- default garages
-  {"Compacts",-354.988891601563,-115.710586547852,38.6966323852539},
-  {"Coupe",698.135375976563,-1130.54235839844,23.348726272583},
-  {"SUVs",-1117.03161621094,-2012.15710449219,13.1818408966064},
-  {"Supers",2132.22802734375,4780.6083984375,40.9702758789063},
-  {"Motorcycles",74.1576232910156,3643.208984375,39.5487213134766},
-  {"Motorcycles",981.791748046875,-113.413665771484,74.0816955566406},
-  {"Vans",1224.89562988281,2722.58666992188,38.0041313171387},
-  {"Sedans",233.66178894043,-789.788513183594,30.5983638763428},
-  {"Sports",-2294.12915039063,372.463104248047,174.601791381836},
-  {"Muscle Cars",-2186.0439453125,-410.179321289063,13.095627784729},
-  {"Off-Road",-81.005973815918,6494.27587890625,31.490894317627},
-  {"Emergency",-569.772766113281,-147.19221496582,37.948974609375},
-  {"Commercial",1225.87951660156,-3228.38916015625,6.02876377105713},
-  {"Industrial",912.464477539063,-1523.63122558594,30.7371978759766},
-  {"Service",916.735717773438,-162.684844970703,74.7201614379883},
-  {"Military",-2132.3681640625,3263.23583984375,32.8102760314941},
-  {"Classics",-205.789, -1308.02, 31.2916},
-  
-  -- personal garages
-  {"Personal",215.124,-791.377,30.646},
-  {"Personal",-334.685,289.773,85.705},
-  {"Personal",-55.272,-1838.71,26.442},
-  {"Personal",126.434,6610.04,31.750},
-  
-  -- lscustoms
-  --{"LS Customs",-337.3863,-136.9247,39.0737},
-  --{"LS Customs",-1155.536,-2007.183,13.244},
-  --{"LS Customs",731.8163,-1088.822,22.233},
-  --{"LS Customs",1175.04,2640.216,37.82177},
-  --{"LS Customs",110.8406,6626.568,32.287},
-  
-  -- house garages
-  {"Ranch Main", 1408.32495117188,1117.44665527344,114.737692260742},
-  {"Rich Housing", -751.5107421875,365.883117675781,87.9666687011719},
-  {"Rich Housing 2",	-81.860595703125,-809.427734375,36.4030570983887},
-  {"Basic Housing 1", -635.4501953125,57.4368324279785,44.8587303161621},
-  {"Basic Housing 2", -1448.18701171875,-514.856567382813,31.6881823348999},
-  {"Regular House 1", 843.398803710938,-191.063568115234,72.6714935302734},
-  {"Regular House 2",  174.276748657227,483.056274414063,142.339096069336},
-  {"Regular House 3", -820.590148925781,184.175857543945,72.0921401977539},
-  {"Regular House 4", -1858.14965820313,328.570861816406,88.6500091552734},
-  {"Regular House 5", -25.002462387085,-1436.29431152344,30.6531391143799},
-  {"Regular House 6", -2587,1930.97326660156,167.304656982422},
-  
-  -- planes and boats
-  {"Boats",-849.5, -1368.64, 1.6},
-  {"Civilian Planes",1640, 3236, 40.4},
-  {"Military Planes",-1348, -2230, 13.9},
-  {"Civilian Helicopters",1750, 3260, 41.37},
-  {"Military Helicopters",-1233, -2269, 13.9},
-  {"Civilian Planes",-1277.59094238281,-3391.39233398438,13.9401473999023},
-  {"Military Planes",1066.958984375,3078.87353515625,41.0369453430176},
-  {"Civilian Helicopters",-745.37255859375,-1468.43969726563,5.00051975250244},
-  {"Military Helicopters",1403.12109375,3002.36987304688,40.5485992431641},
-  --{"planes",2123, 4805, 41.19},
-  --{"helicopters",-745, -1468, 5},
-  --{"boats",1538, 3902, 30.35}
-  
+	--{ "oficina",-793.30,-191.10,37.37,nil,nil,nil,nil,50,false },
+	--{ "oficina",-32.68,-1089.56,26.42,nil,nil,nil,nil,50,false },
+	--{ "oficina",-789.15,-198.09,37.37,nil,nil,nil,nil,50,false },
+	--{ "oficina",-211.69,-1323.66,30.89,nil,nil,nil,nil,50,false }, --bennys original
+	--{ "oficina",730.96,-1088.61,22.16,nil,nil,nil,nil,50,false },  -- garagem dos beekers
+	--{ "oficina",-339.01,-136.69,39.00,nil,nil,nil,nil,50,false }, --lscunstons
+	{ "Carros",-38.84,-1099.29,26.42,nil,nil,nil,nil,50,false },           
+	{ "Motos",-43.23,-1097.60,26.42,nil,nil,nil,nil,50,false },
+	{ "Importados",-47.82,-1095.89,26.42,nil,nil,nil,nil,50,false },
+	{ "locadora",-57.31,-1097.35,26.42,-54.73,-1110.30,26.43,160.0,0,true }, 
+	{ "Garagem",55.43,-876.19,30.66,44.20,-870.47,30.46,160.0,0,true },
+	{ "Garagem",317.25,2623.14,44.46,334.52,2623.09,44.49,20.0,0,true },
+	{ "Garagem",-773.34,5598.15,33.60,-772.82,5578.48,33.48,89.0,0,true },
+	{ "Garagem",275.23,-345.54,45.17,285.05,-339.29,44.91,249.0,0,true },
+	{ "Garagem",596.40,90.65,93.12,608.21,104.11,92.81,70.0,0,true },
+	{ "Garagem",-340.76,265.97,85.67,-328.80,277.92,86.34,95.0,0,true },
+	{ "Garagem",-2030.01,-465.97,11.60,-2024.27,-471.93,11.40,140.0,0,true },
+	{ "Garagem",-1184.92,-1510.00,4.64,-1186.70,-1490.54,4.37,125.0,0,true },
+	{ "Garagem",-73.44,-2004.99,18.27,-84.96,-2004.22,18.01,352.0,0,true },
+	{ "Garagem",214.02,-808.44,31.01,227.62,-789.23,30.68,247.0,0,true },
+	{ "Garagem",-348.88,-874.02,31.31,-334.58,-891.73,31.07,345.0,0,true },
+	{ "Garagem",67.74,12.27,69.21,57.63,18.25,69.29,339.38,0,true },
+	{ "motoclube",899.26,-2110.07,30.76,906.73,-2100.92,30.77,339.38,0,true }, 
+	{ "Garagem",361.90,297.81,103.88,371.18,284.78,103.25,338.86,0,true },
+	{ "Policia",458.67,-1008.08,28.27,447.20,-1021.32,28.45,90.0,50,true },
+	{ "Policia",1851.23,3683.34,34.26,1873.68,3686.05,33.58,210.0,50,true },
+	{ "Policia",-452.07,6005.75,31.84,-463.50,6009.80,31.34,90.0,50,true },
+	{ "Paramedico",295.12,-600.61,43.30,291.96,-608.69,43.36,70.0,50,true },
+	{ "Paramedico",1815.96,3678.71,34.27,1805.27,3680.97,34.22,120.0,50,true },
+	{ "Paramedico",-248.14,6332.97,32.42,-259.22,6344.43,32.42,90.0,50,true },
+	{ "Mecanico",-229.45,-1377.43,31.25,-232.96,-1391.51,31.25,180.0,50,false },
+	{ "Taxista",895.36,-179.28,74.70,910.51,-177.95,74.26,240.0,50,false },
+	{ "Carteiro",68.95,126.94,79.20,72.89,121.01,79.18,160.0,50,false },
+    { "Lixeiro",-341.58,-1567.46,25.22,-342.17,-1560.10,25.23,100.0,50,false },
+	{ "Motorista",453.89,-600.57,28.58,462.22,-605.06,28.49,220.0,50,false },
+	{ "Bicicletario",-1177.82,-1564.45,4.47,-1189.17,-1571.31,4.32,125.0,50,false },
+	{ "Bicicletario",-896.17,-781.21,15.91,-897.22,-778.68,15.91,80.0,50,false },
+	{ "Bicicletario",-250.727,-1529.59,31.58,-247.68,-1527.71,31.59,230.0,50,false },
+	{ "Embarcacoes",-1605.19,-1164.37,1.28,-1619.61,-1175.78,-0.08,130.0,50,false },
+	{ "Embarcacoes",-1522.68,1494.92,111.58,-1526.63,1499.64,109.08,350.0,50,false },
+	{ "Embarcacoes",1337.36,4269.71,31.50,1343.24,4269.59,30.11,190.0,50,false },
+	{ "Embarcacoes",-192.32,791.54,198.10,-195.95,788.35,195.93,230.0,50,false },
+	{ "Bulbasaur",-789.45,307.83,85.70,-795.85,303.96,85.70,179.0,50,false },
+	{ "Ivysaur",164.79,-575.29,43.86,149.66,-585.29,43.98,67.0,50,false },
+	{ "Venusaur",-1299.98,-410.16,35.75,-1299.24,-405.64,35.91,297.0,50,false },
+	{ "Squirtle",-1437.50,-545.39,34.74,-1417.43,-523.60,31.90,213.0,50,false },
+	{ "Blastoise",-927.69,-393.46,38.96,-922.50,-408.35,37.56,115.0,50,false },
+	{ "Metapod",-337.06,207.71,88.57,-331.29,216.83,87.54,358.0,50,false },
+	{ "Clefairy",1401.35,1114.99,114.83,1406.73,1118.89,114.83,87.0,50,false },
+	{ "Clefable",-1149.42,-1535.88,4.35,-1155.71,-1549.34,4.27,301.0,50,false },
+	{ "Vulpix",-809.62,189.91,72.47,-820.07,184.30,72.13,130.0,50,false },
+	{ "Ninetales",-188.88,500.52,134.64,-189.37,505.09,134.50,290.0,50,false },
+	{ "Jigglypuff",350.45,438.48,147.47,355.79,438.24,146.00,290.0,50,false },
+	{ "Wigglytuff",391.12,428.44,144.10,391.29,434.54,143.24,260.0,50,false },
+	{ "Zubat",-682.91,601.79,143.66,-687.15,605.04,143.71,320.0,50,false },
+	{ "Golbat",-755.32,627.34,142.76,-749.56,628.13,142.45,190.0,50,false },
+	{ "Oddish",-865.31,696.79,149.00,-862.28,704.71,149.12,270.0,50,false },
+	{ "Gloom",131.63,565.70,183.87,131.06,571.19,183.43,270.0,50,false },
+	{ "Vileplume",-1323.06,445.33,99.80,-1323.20,450.40,99.72,1.0,50,false },
+	{ "Machoke",-1492.95,421.42,111.24,-1507.75,429.52,111.07,50.0,50,false },
+	{ "Machamp",-1405.56,540.03,122.92,-1412.13,538.28,122.53,100.0,50,false },
+	{ "Bellsprout",-1365.74,603.67,133.87,-1356.17,605.95,134.02,10.0,50,false },
+    { "Weepinbell",-963.26,761.97,175.46,-969.55,766.17,175.20,40.0,50,false },
+	{ "Victreebel",-440.65,684.42,153.06,-442.65,677.18,152.24,120.0,50,false },
+	{ "Tentacool",1290.13,-585.26,71.74,1295.45,-567.97,71.23,350.0,50,false },
+	{ "Tentacruel",1311.15,-592.49,72.92,1318.95,-575.41,72.98,340.0,50,false },
+	{ "Geodude",1344.92,-609.22,74.35,1351.63,-595.03,74.33,320.0,50,false },
+	{ "Graveler",1359.97,-620.09,74.33,1360.12,-600.839,74.33,360.0,50,false },
+	{ "Golem",1392.43,-607.50,74.33,1377.72,-596.03,74.33,50.0,50,false },
+	{ "Ponyta",1404.30,-570.85,74.34,1387.43,-577.91,74.33,110.0,50,false },
+	{ "Rapidash",1366.80,-544.94,74.33,1363.47,-552.22,74.33,160.0,50,false },
+	{ "Slowpoke",1360.39,-537.19,73.77,1353.13,-554.18,74.10,160.0,50,false },
+	{ "Slowbro",1321.85,-525.14,72.12,1317.99,-534.88,72.05,160.0,50,false },
+	{ "Magnemite",1314.76,-516.79,71.39,1308.05,-535.15,71.29,160.0,50,false },
+	{ "Magneton",-23.59,-1427.51,30.65,-24.14,-1438.26,30.65,180.0,50,false },
+	{ "Doduo",24.41,541.41,176.02,13.31,547.29,176.03,92.0,50,false },
+	{ "Caminhao",1240.22,-3162.63,7.10,1245.27,-3155.88,5.56,269.56,50,false }
 }
 
 return cfg
