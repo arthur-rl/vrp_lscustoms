@@ -20,7 +20,7 @@
    - **Model:** Vehicle model name that is going to be searched on the database.
    - **Entity:** Vehicle entity.
    
-**PS**
+**PS:**
    - If you want to use with permission you will need to change **LSC_Config.oldenter** to **true** in the **vrp_lscustoms/lsconfig.lua** archive!
    ```lua
        LSC_Config.oldenter = true 
@@ -43,8 +43,8 @@
    - **Modelo:** Nome do modelo do veículo que irá ser pesquisado na database.
    - **Entidade:** Entidade do veículo.
 
-**OBS**
-   - Se quiser utilizar com permissão (*lsc.use**), você precisa mudar **LSC_Config.oldenter** para **true** no arquivo **vrp_lscustoms/lsconfig.lua**!
+**OBS:**
+   - Se quiser utilizar com permissão (**lsc.use**) você precisa mudar **LSC_Config.oldenter** para **true** no arquivo **vrp_lscustoms/lsconfig.lua**!
    ```lua
        LSC_Config.oldenter = true
    ```
