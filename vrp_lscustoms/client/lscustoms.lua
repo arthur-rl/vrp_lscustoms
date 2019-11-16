@@ -1031,9 +1031,11 @@ AddEventHandler("LSC:save", function (model, vehicle)
 			mods = {}
 		}
 
+
+
 		for i = 0, 48 do
 			if i == 18 or i == 22 then
-				if IsToggleModOn(i) then
+				if IsToggleModOn(vehicle, i) then
 					modifications.mods[i] = {mod = 1}
 				else
 					modifications.mods[i] = {mod = 0}
