@@ -44,7 +44,7 @@
    - **Entidade:** Entidade do veículo.
 
 **OBS**
-   - Se quiser utilizar com permissão (*lsc.use**), você precisa mudar **LSC_Config.oldenter** para **true** no arquivo **vrp_lscustoms/lsconfig.lua**!
+   - Se quiser utilizar com permissão (**lsc.use**) você precisa mudar **LSC_Config.oldenter** para **true** no arquivo **vrp_lscustoms/lsconfig.lua**!
    ```lua
        LSC_Config.oldenter = true
    ```
