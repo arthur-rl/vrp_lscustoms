@@ -6,16 +6,19 @@ Do not reupload/re release any part of this script without my permission
 ]]
 
 local Proxy = module("vrp", "lib/Proxy")
+local Tunnel = module("vrp", "lib/Tunnel")
 
 local vRP = Proxy.getInterface("vRP")
 
+local tLSC = {}
+Tunnel.bindInterface("vrp_lscustoms", tLSC)
 
 Citizen.CreateThread(function ()
 	vRP.prepare("vRP/create_modifications_column", "alter table vrp_user_vehicles add if not exists modifications text not null")
 	vRP.prepare("vRP/update_vehicle_modifications", "update vrp_user_vehicles set modifications = @modifications where user_id = @user_id and vehicle = @vehicle")
 	vRP.prepare("vRP/get_vehicle_modifications", "select modifications from vrp_user_vehicles where user_id = @user_id and vehicle = @vehicle")
 
-	vRP.execute("vRP/create_modifications_column")
+	vRP.execute("vRP/create_modifications_column", {})
 end)
 
 local tbl = {
@@ -26,6 +29,14 @@ local tbl = {
 	[5] = {locked = false, player = nil},
 	[6] = {locked = false, player = nil},
 }
+
+function tLSC.hasPermission()
+	local user_id = vRP.getUserId(source)
+	if user_id then
+		return vRP.hasPermission(user_id, "lsc.use")
+	end
+	return false
+end
 
 RegisterServerEvent('lockGarage')
 AddEventHandler('lockGarage', function(b,garage)
@@ -64,15 +75,6 @@ AddEventHandler("LSC:buttonSelected", function(name, button)
 	end
 end)
 
-RegisterServerEvent("LSC:finished")
-AddEventHandler("LSC:finished", function(veh)
-	local source = source
-	local user_id = vRP.getUserId(source)
-	if user_id then
-		vRP.execute("vRP/update_vehicle_modifications", {user_id = user_id, vehicle = veh.model, modifications = json.encode({color = veh.color, extraColor = veh.extracolor, neon = veh.neon, neonColor = veh.neoncolor, xenonColor = veh.xenoncolor, smokeColor = veh.smokecolor, wheelType = veh.wheeltype, bulletProofTyres = veh.bulletProofTyres, windowTint = veh.windowtint, plateIndex = veh.plateindex, mods = veh.mods})})
-	end
-end)
-
 RegisterServerEvent("LSC:applyModifications")
 AddEventHandler("LSC:applyModifications", function (model, vehicle)
 	local source = source
@@ -86,4 +88,13 @@ AddEventHandler("LSC:applyModifications", function (model, vehicle)
 			end
 		end
 	end
+end)
+
+RegisterServerEvent("LSC:save")
+AddEventHandler("LSC:save", function (model, modifications)
+    local source = source
+    local user_id = vRP.getUserId(source)
+    if user_id then
+        vRP.execute("vRP/update_vehicle_modifications", {user_id = user_id, vehicle = model, modifications = json.encode(modifications)})
+    end
 end)

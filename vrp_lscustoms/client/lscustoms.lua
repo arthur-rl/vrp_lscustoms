@@ -6,8 +6,11 @@ Do not reupload/re release any part of this script without my permission
 ]]
 
 local Proxy = module("vrp", "lib/Proxy")
+local Tunnel = module("vrp", "lib/Tunnel")
 
 local vRP_adv_garages = Proxy.getInterface("vrp_adv_garages")
+
+local LSCServer = Tunnel.getInterface("vrp_lscustoms")
 
 local inside = false
 local currentpos = nil
@@ -566,15 +569,7 @@ local function DriveOutOfGarage(pos)
 		TaskVehicleDriveToCoord(ped, veh, pos.outside.x, pos.outside.y, pos.outside.z, f(5), f(0.1), GetEntityModel(veh), 16777216, f(0.1), true)
 		
 		pos = currentpos.driveout
-		
-		--The vehicle customization is finished, so we send to server our vehicle data
-		ok, model = vRP_adv_garages.getNearestOwnedVehicle(1)
 
-		if ok then
-			myveh.model = model
-			TriggerServerEvent("LSC:finished", myveh)
-		end
-		
 		StartFade()
 		Citizen.Wait(500)
 		SetEntityCollision(veh,true,true)
@@ -680,10 +675,14 @@ Citizen.CreateThread(function()
 										end
 									else
 										if IsControlJustPressed(1,201) then
-											inside = true
-											currentpos = pos
-											currentgarage = i
-											DriveInGarage()
+											if LSCServer.hasPermission() then
+												inside = true
+												currentpos = pos
+												currentgarage = i
+												DriveInGarage()
+											else
+												Notify("~r~Você não é um mecânico!")
+											end
 										else
 											drawTxt("Press ~b~ENTER~w~ to enter ~b~Los Santos Customs ",4,1,0.5,0.8,1.0,255,255,255,255)
 										end
@@ -1004,7 +1003,6 @@ AddEventHandler("LSC:applyModifications", function (vehicle, modifications)
 		SetVehicleWheelType(vehicle, modifications.wheelType)
 		SetVehicleTyresCanBurst(vehicle, modifications.bulletProofTyres)
 		SetVehicleWindowTint(vehicle, modifications.windowTint)
-		SetVehicleNumberPlateTextIndex(vehicle, modifications.plateIndex)
 		for k, v in pairs(modifications.mods) do
 			k = tonumber(k)
 			if k == 18 or k == 22 then
@@ -1015,6 +1013,40 @@ AddEventHandler("LSC:applyModifications", function (vehicle, modifications)
 				SetVehicleMod(vehicle, k, v.mod)
 			end
 		end
+	end
+end)
+
+AddEventHandler("LSC:save", function (model, vehicle)
+	if model and vehicle then
+		local modifications = {
+			color = {GetVehicleColours(vehicle)},
+			extraColor = {GetVehicleExtraColours(vehicle)},
+			neon = IsVehicleNeonLightEnabled(0) or IsVehicleNeonLightEnabled(1) or IsVehicleNeonLightEnabled(2) or IsVehicleNeonLightEnabled(3),
+			neonColor = {GetVehicleNeonLightsColour(vehicle)},
+			xenonColor = GetVehicleHeadlightsColour(vehicle),
+			smokeColor = {GetVehicleTyreSmokeColor(vehicle)},
+			wheelType = GetVehicleWheelType(vehicle),
+			bulletProofTyres = GetVehicleTyresCanBurst(vehicle),
+			windowTint = GetVehicleWindowTint(vehicle),
+			mods = {}
+		}
+
+		for i = 0, 48 do
+			if i == 18 or i == 22 then
+				if IsToggleModOn(i) then
+					modifications.mods[i] = {mod = 1}
+				else
+					modifications.mods[i] = {mod = 0}
+				end
+			else
+				modifications.mods[i] = {mod = GetVehicleMod(vehicle, i)}
+				if i == 23 or i == 24 then
+					modifications.mods[i].variation = GetVehicleModVariation(vehicle, i)
+				end
+			end
+		end
+
+		TriggerServerEvent("LSC:save", model, modifications)
 	end
 end)
 

@@ -342,6 +342,9 @@ end
 function vRPg.despawnGarageVehicle(name)
 	local vehicle = vehicles[name]
 	if vehicle then
+
+		TriggerEvent("LSC:save", name, vehicle[2])
+
 		TriggerServerEvent("vrp_adv_garages_id2",name,GetVehicleEngineHealth(vehicle[2]),GetVehicleBodyHealth(vehicle[2]),GetVehicleFuelLevel(vehicle[2]))
 		SetVehicleHasBeenOwnedByPlayer(vehicle[2],false)
 		Citizen.InvokeNative(0xAD738C3085FE7E11,vehicle[2],true,true)
