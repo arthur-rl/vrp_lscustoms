@@ -1021,7 +1021,7 @@ AddEventHandler("LSC:save", function (model, vehicle)
 		local modifications = {
 			color = {GetVehicleColours(vehicle)},
 			extraColor = {GetVehicleExtraColours(vehicle)},
-			neon = IsVehicleNeonLightEnabled(0) or IsVehicleNeonLightEnabled(1) or IsVehicleNeonLightEnabled(2) or IsVehicleNeonLightEnabled(3),
+			neon = IsVehicleNeonLightEnabled(vehicle, 0) or IsVehicleNeonLightEnabled(vehicle, 1) or IsVehicleNeonLightEnabled(vehicle, 2) or IsVehicleNeonLightEnabled(vehicle, 3),
 			neonColor = {GetVehicleNeonLightsColour(vehicle)},
 			xenonColor = GetVehicleHeadlightsColour(vehicle),
 			smokeColor = {GetVehicleTyreSmokeColor(vehicle)},
