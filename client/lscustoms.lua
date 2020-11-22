@@ -565,7 +565,7 @@ local function DriveOutOfGarage(pos)
 	Citizen.CreateThread(function()
 	
 		local ped = LocalPed()
-		local veh = GetVehiclePedIsUsing(ped)
+		local veh = GetVehiclePedIsIn(ped)
 		
 		pos = currentpos
 		TaskVehicleDriveToCoord(ped, veh, pos.outside.x, pos.outside.y, pos.outside.z, f(5), f(0.1), GetEntityModel(veh), 16777216, f(0.1), true)
@@ -579,7 +579,7 @@ local function DriveOutOfGarage(pos)
 		end
 		myveh.model = model
 
-		if ok then
+		if veh ~= 0 then
 			TriggerServerEvent("LSC:finished", myveh)
 		end
 		
