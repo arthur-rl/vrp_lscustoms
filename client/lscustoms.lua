@@ -5,7 +5,6 @@ Credits - MythicalBro and マーモット#2533 for the vRP version and some bug 
 Do not reupload/re release any part of this script without my permission
 ]]
 
-local Proxy = module("vrp", "lib/Proxy")
 
 local vRP = Proxy.getInterface("vRP")
 
