@@ -79,12 +79,15 @@ AddEventHandler("LSC:applyModifications", function (model, vehicle)
 	local source = source
 	local user_id = vRP.getUserId({source})
 	if model and vehicle and user_id then
-		local rows = MySQL.query("vRPls/get_vehicle_modifications", {user_id = user_id, vehicle = model})
-		if #rows > 0 then
-			local modifications = json.decode(rows[1].modifications)
-			if modifications then
-				TriggerClientEvent("LSC:applyModifications", source, vehicle, modifications)
+		local rows = MySQL.query("vRPls/get_vehicle_modifications", {user_id = user_id, vehicle = model}, function(rows, affected) 
+			if rows ~= nil then 
+				if #rows > 0 then
+					local modifications = json.decode(rows[1].modifications)
+					if modifications then
+						TriggerClientEvent("LSC:applyModifications", source, vehicle, modifications)
+					end
+				end
 			end
-		end
+		end)
 	end
 end)
