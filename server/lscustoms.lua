@@ -61,7 +61,7 @@ AddEventHandler("LSC:buttonSelected", function(name, button)
 	local source = source
 	local user_id = vRP.getUserId({source})
 	if user_id then
-		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment({vRP.getUserId(source), button.price or 0})) -- money
+		TriggerClientEvent("LSC:buttonSelected", source, name, button, vRP.tryFullPayment({vRP.getUserId({source}), button.price or 0})) -- money
 	end
 end)
 
