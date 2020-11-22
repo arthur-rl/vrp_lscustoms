@@ -86,7 +86,11 @@ AddEventHandler("LSC:applyModifications", function (model, vehicle)
 					if modifications then
 						TriggerClientEvent("LSC:applyModifications", source, vehicle, modifications)
 					end
+				else
+					print("#rows is 0")
 				end
+			else
+				print("rows is nil. line 91")
 			end
 		end)
 	end
